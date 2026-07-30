@@ -53,37 +53,6 @@ Download the latest installer for your OS from the [**Releases**](https://github
 
 > macOS/Windows builds are unsigned for now, so you may need to allow the app in Gatekeeper / SmartScreen on first launch.
 
-## Develop
-
-```bash
-npm install      # install dependencies
-npm run dev      # launch the app with hot reload
-npm run typecheck
-```
-
-## Build installers locally
-
-```bash
-npm run dist:mac     # or dist:win / dist:linux (build on the target OS)
-```
-
-Output lands in `release/`.
-
-## Releasing
-
-Push a version tag and GitHub Actions builds and publishes installers for all three platforms to a GitHub Release:
-
-```bash
-npm version patch    # bumps package.json + creates the tag
-git push --follow-tags
-```
-
-See [`.github/workflows/release.yml`](.github/workflows/release.yml).
-
-## Tech stack
-
-Electron · electron-vite · React · TypeScript · MUI (Material Design) · Node `crypto` (scrypt + AES-256-GCM) · electron-builder.
-
 ## License
 
 MIT © Mr-Don-Leo

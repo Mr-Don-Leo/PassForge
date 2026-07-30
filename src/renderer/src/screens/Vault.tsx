@@ -11,6 +11,8 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Menu,
+  MenuItem,
   Snackbar,
   Stack,
   TextField,
@@ -26,14 +28,18 @@ import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import VpnKeyRoundedIcon from '@mui/icons-material/VpnKeyRounded'
+import KeyRoundedIcon from '@mui/icons-material/KeyRounded'
+import PasswordRoundedIcon from '@mui/icons-material/PasswordRounded'
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded'
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
-import { api, CATEGORIES, categoryById, DEFAULT_CATEGORY, type AppState, type VaultEntry } from '../api'
+import TuneRoundedIcon from '@mui/icons-material/TuneRounded'
+import { api, categoryById, type AppState, type Category, type ItemType, type VaultEntry } from '../api'
 import { CategoryIcon } from '../categories'
 import { useColorMode } from '../ColorMode'
 import EntryDialog from '../components/EntryDialog'
 import SettingsDialog from '../components/SettingsDialog'
+import CategoryManager from '../components/CategoryManager'
 
 interface Props {
   state: AppState
@@ -45,18 +51,23 @@ const SIDEBAR_WIDTH = 232
 
 export default function VaultScreen({ state, onLock, onStateChange }: Props): JSX.Element {
   const [entries, setEntries] = useState<VaultEntry[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<string>('all')
   const [editing, setEditing] = useState<VaultEntry | null>(null)
+  const [newType, setNewType] = useState<ItemType>('password')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [managerOpen, setManagerOpen] = useState(false)
+  const [addAnchor, setAddAnchor] = useState<null | HTMLElement>(null)
   const [toast, setToast] = useState('')
   const { resolved, toggle } = useColorMode()
   const isMac = state.platform === 'darwin'
 
   const load = useCallback(async () => {
-    const res = await api.listEntries()
-    if (res.ok) setEntries(res.value)
+    const [e, c] = await Promise.all([api.listEntries(), api.listCategories()])
+    if (e.ok) setEntries(e.value)
+    if (c.ok) setCategories(c.value)
   }, [])
 
   useEffect(() => {
@@ -69,11 +80,16 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
     return c
   }, [entries])
 
+  const visibleCategories = useMemo(() => categories.filter((c) => !c.hidden), [categories])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     let list = entries
     if (selected !== 'all') list = list.filter((e) => e.category === selected)
-    if (q) list = list.filter((e) => `${e.title} ${e.username} ${e.url}`.toLowerCase().includes(q))
+    if (q)
+      list = list.filter((e) =>
+        `${e.title} ${e.username} ${e.clientId} ${e.url}`.toLowerCase().includes(q)
+      )
     return [...list].sort((a, b) => a.title.localeCompare(b.title))
   }, [entries, query, selected])
 
@@ -82,8 +98,10 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
     setToast(`${label} copied`)
   }
 
-  const openNew = (): void => {
+  const openNew = (type: ItemType): void => {
     setEditing(null)
+    setNewType(type)
+    setAddAnchor(null)
     setDialogOpen(true)
   }
 
@@ -156,13 +174,7 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Toolbar
         style={dragStyle}
-        sx={{
-          gap: 1,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          pl: isMac ? '80px' : 2,
-          minHeight: 56
-        }}
+        sx={{ gap: 1, borderBottom: '1px solid', borderColor: 'divider', pl: isMac ? '80px' : 2, minHeight: 56 }}
       >
         <VpnKeyRoundedIcon color="primary" />
         <Typography variant="h6" sx={{ mr: 2 }}>
@@ -222,21 +234,29 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
               count={entries.length}
               icon={<Inventory2RoundedIcon fontSize="small" />}
             />
-            <Typography
-              variant="overline"
-              color="text.secondary"
-              sx={{ px: 2.5, pt: 1.5, pb: 0.5, display: 'block' }}
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ px: 2.5, pt: 1.5, pb: 0.5 }}
             >
-              Categories
-            </Typography>
-            {CATEGORIES.map((c) => (
+              <Typography variant="overline" color="text.secondary">
+                Categories
+              </Typography>
+              <Tooltip title="Manage categories">
+                <IconButton size="small" onClick={() => setManagerOpen(true)}>
+                  <TuneRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+            {visibleCategories.map((c) => (
               <SidebarRow
                 key={c.id}
                 id={c.id}
                 label={c.label}
                 color={c.color}
                 count={counts[c.id] || 0}
-                icon={<CategoryIcon id={c.id} fontSize="small" />}
+                icon={<CategoryIcon icon={c.icon} fontSize="small" />}
               />
             ))}
           </List>
@@ -252,7 +272,10 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
           ) : (
             <List sx={{ maxWidth: 720, mx: 'auto', p: 2 }}>
               {filtered.map((entry) => {
-                const cat = categoryById(entry.category)
+                const cat = categoryById(categories, entry.category)
+                const isSecret = entry.type === 'secret'
+                const primary = isSecret ? entry.secret : entry.password
+                const secondary = isSecret ? entry.clientId : entry.username
                 return (
                   <ListItem
                     key={entry.id}
@@ -260,25 +283,25 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
                     sx={{ mb: 1 }}
                     secondaryAction={
                       <Stack direction="row" spacing={0.5}>
-                        <Tooltip title="Copy username">
+                        <Tooltip title={isSecret ? 'Copy Client ID' : 'Copy username'}>
                           <span>
                             <IconButton
                               size="small"
-                              disabled={!entry.username}
-                              onClick={() => copy(entry.username, 'Username')}
+                              disabled={!secondary}
+                              onClick={() => copy(secondary, isSecret ? 'Client ID' : 'Username')}
                             >
                               <ContentCopyRoundedIcon fontSize="small" />
                             </IconButton>
                           </span>
                         </Tooltip>
-                        <Tooltip title="Copy password">
+                        <Tooltip title={isSecret ? 'Copy secret' : 'Copy password'}>
                           <span>
                             <IconButton
                               size="small"
-                              disabled={!entry.password}
-                              onClick={() => copy(entry.password, 'Password')}
+                              disabled={!primary}
+                              onClick={() => copy(primary, isSecret ? 'Secret' : 'Password')}
                             >
-                              <VpnKeyRoundedIcon fontSize="small" />
+                              <KeyRoundedIcon fontSize="small" />
                             </IconButton>
                           </span>
                         </Tooltip>
@@ -299,7 +322,7 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
                           variant="rounded"
                           sx={{ bgcolor: alpha(cat.color, 0.16), color: cat.color, width: 40, height: 40 }}
                         >
-                          <CategoryIcon id={entry.category} fontSize="small" />
+                          <CategoryIcon icon={cat.icon} fontSize="small" />
                         </Avatar>
                       </ListItemIcon>
                       <ListItemText
@@ -318,8 +341,16 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
                                 '& .MuiChip-label': { px: 1 }
                               }}
                             />
+                            {isSecret && (
+                              <Chip
+                                size="small"
+                                label="Secret"
+                                variant="outlined"
+                                sx={{ height: 20, '& .MuiChip-label': { px: 1 } }}
+                              />
+                            )}
                             <Typography variant="body2" color="text.secondary" component="span" noWrap>
-                              {entry.username || '—'}
+                              {secondary || '—'}
                             </Typography>
                           </Stack>
                         }
@@ -331,16 +362,38 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
             </List>
           )}
 
-          <Fab color="primary" onClick={openNew} sx={{ position: 'absolute', right: 28, bottom: 28 }}>
+          <Fab color="primary" onClick={(e) => setAddAnchor(e.currentTarget)} sx={{ position: 'absolute', right: 28, bottom: 28 }}>
             <AddRoundedIcon />
           </Fab>
+          <Menu
+            anchorEl={addAnchor}
+            open={Boolean(addAnchor)}
+            onClose={() => setAddAnchor(null)}
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          >
+            <MenuItem onClick={() => openNew('password')}>
+              <ListItemIcon>
+                <PasswordRoundedIcon fontSize="small" />
+              </ListItemIcon>
+              Password
+            </MenuItem>
+            <MenuItem onClick={() => openNew('secret')}>
+              <ListItemIcon>
+                <KeyRoundedIcon fontSize="small" />
+              </ListItemIcon>
+              Secret / API key
+            </MenuItem>
+          </Menu>
         </Box>
       </Box>
 
       <EntryDialog
         open={dialogOpen}
         entry={editing}
-        defaultCategory={selected !== 'all' ? selected : DEFAULT_CATEGORY}
+        type={newType}
+        categories={categories}
+        defaultCategory={selected !== 'all' ? selected : undefined}
         onClose={() => setDialogOpen(false)}
         onSaved={() => {
           setDialogOpen(false)
@@ -352,6 +405,15 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
         state={state}
         onClose={() => setSettingsOpen(false)}
         onChange={onStateChange}
+      />
+      <CategoryManager
+        open={managerOpen}
+        categories={categories}
+        onClose={() => setManagerOpen(false)}
+        onChanged={() => {
+          setSelected('all')
+          load()
+        }}
       />
 
       <Snackbar

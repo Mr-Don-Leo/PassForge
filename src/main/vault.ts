@@ -4,7 +4,15 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { deriveKey, KDF, open, randomBytes, seal, type Sealed } from './crypto'
 import { biometricAvailable, promptBiometric, unwrapWithOS, wrapWithOS } from './biometric'
-import { DEFAULT_CATEGORY, type PasswordOptions, type VaultEntry } from '../shared/types'
+import {
+  DEFAULT_CATEGORIES,
+  DEFAULT_CATEGORY,
+  FALLBACK_CATEGORY,
+  type Category,
+  type ItemType,
+  type PasswordOptions,
+  type VaultEntry
+} from '../shared/types'
 
 /** On-disk vault format. Secrets are only ever stored sealed. */
 interface VaultFile {
@@ -14,9 +22,37 @@ interface VaultFile {
   passcodeWrap: Sealed
   /** DEK wrapped by the OS keychain (biometric), or null if not enrolled. */
   biometricWrap: string | null
-  /** The entries array, sealed with the DEK. */
+  /** The vault payload ({ entries, categories }), sealed with the DEK. */
   data: Sealed
   security: { failedAttempts: number; lockedUntil: number }
+}
+
+/** Decrypted vault payload. */
+interface Payload {
+  entries: VaultEntry[]
+  categories: Category[]
+}
+
+function seedCategories(): Category[] {
+  return JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)) as Category[]
+}
+
+/** Fill in fields added in later versions so older vaults keep working. */
+function normalizeEntry(e: Partial<VaultEntry>): VaultEntry {
+  return {
+    id: e.id ?? '',
+    type: (e.type as ItemType) || 'password',
+    title: e.title ?? '',
+    category: e.category || DEFAULT_CATEGORY,
+    username: e.username ?? '',
+    password: e.password ?? '',
+    url: e.url ?? '',
+    clientId: e.clientId ?? '',
+    secret: e.secret ?? '',
+    notes: e.notes ?? '',
+    createdAt: e.createdAt ?? Date.now(),
+    updatedAt: e.updatedAt ?? Date.now()
+  }
 }
 
 // Escalating lockout after repeated wrong passcodes (ms).
@@ -32,6 +68,7 @@ export class Vault {
   private file: string
   private dek: Buffer | null = null
   private entries: VaultEntry[] = []
+  private categories: Category[] = []
 
   constructor() {
     this.file = path.join(app.getPath('userData'), 'vault.pfvault')
@@ -55,6 +92,19 @@ export class Vault {
     const tmp = `${this.file}.tmp`
     fs.writeFileSync(tmp, JSON.stringify(v), { mode: 0o600 })
     fs.renameSync(tmp, this.file)
+  }
+
+  /** Decrypt the payload into memory, migrating older formats. */
+  private loadPayload(dek: Buffer, file: VaultFile): void {
+    const raw = JSON.parse(open(dek, file.data).toString()) as VaultEntry[] | Partial<Payload>
+    if (Array.isArray(raw)) {
+      // v0.2.0 stored a bare entries array.
+      this.entries = raw.map(normalizeEntry)
+      this.categories = seedCategories()
+    } else {
+      this.entries = (raw.entries ?? []).map(normalizeEntry)
+      this.categories = raw.categories?.length ? raw.categories : seedCategories()
+    }
   }
 
   biometricEnrolled(): boolean {
@@ -88,13 +138,14 @@ export class Vault {
       kdf: { salt: salt.toString('base64'), N: KDF.N, r: KDF.r, p: KDF.p },
       passcodeWrap: seal(kek, dek),
       biometricWrap: enrollBiometric && biometricAvailable() ? wrapWithOS(dek) : null,
-      data: seal(dek, Buffer.from(JSON.stringify([]))),
+      data: seal(dek, Buffer.from(JSON.stringify({ entries: [], categories: seedCategories() }))),
       security: { failedAttempts: 0, lockedUntil: 0 }
     }
     this.write(file)
 
     this.dek = dek
     this.entries = []
+    this.categories = seedCategories()
   }
 
   unlockWithPasscode(passcode: string): { ok: true } | { ok: false; error: string; lockedUntil?: number } {
@@ -108,7 +159,7 @@ export class Vault {
     try {
       const kek = deriveKey(passcode, Buffer.from(file.kdf.salt, 'base64'))
       const dek = open(kek, file.passcodeWrap) // throws on wrong passcode
-      this.entries = JSON.parse(open(dek, file.data).toString()) as VaultEntry[]
+      this.loadPayload(dek, file)
       this.dek = dek
 
       if (file.security.failedAttempts !== 0 || file.security.lockedUntil !== 0) {
@@ -139,7 +190,7 @@ export class Vault {
 
     try {
       const dek = unwrapWithOS(file.biometricWrap)
-      this.entries = JSON.parse(open(dek, file.data).toString()) as VaultEntry[]
+      this.loadPayload(dek, file)
       this.dek = dek
       return { ok: true }
     } catch {
@@ -151,6 +202,7 @@ export class Vault {
     if (this.dek) this.dek.fill(0)
     this.dek = null
     this.entries = []
+    this.categories = []
   }
 
   // ---- biometric enrolment (while unlocked) ---------------------------------
@@ -190,14 +242,14 @@ export class Vault {
   // ---- entries CRUD ---------------------------------------------------------
 
   list(): VaultEntry[] {
-    // Default legacy entries that predate categories.
-    return this.entries.map((e) => ({ ...e, category: e.category || DEFAULT_CATEGORY }))
+    return this.entries.map((e) => ({ ...e }))
   }
 
   private persist(): void {
     if (!this.dek) throw new Error('Vault is locked.')
     const file = this.read()
-    file.data = seal(this.dek, Buffer.from(JSON.stringify(this.entries)))
+    const payload: Payload = { entries: this.entries, categories: this.categories }
+    file.data = seal(this.dek, Buffer.from(JSON.stringify(payload)))
     this.write(file)
   }
 
@@ -207,21 +259,17 @@ export class Vault {
     if (entry.id) {
       const idx = this.entries.findIndex((e) => e.id === entry.id)
       if (idx === -1) throw new Error('Entry not found.')
-      this.entries[idx] = { ...this.entries[idx], ...entry, id: entry.id, updatedAt: now }
+      this.entries[idx] = normalizeEntry({
+        ...this.entries[idx],
+        ...entry,
+        id: entry.id,
+        createdAt: this.entries[idx].createdAt,
+        updatedAt: now
+      })
       this.persist()
       return { ...this.entries[idx] }
     }
-    const created: VaultEntry = {
-      id: randomUUID(),
-      title: entry.title,
-      username: entry.username,
-      password: entry.password,
-      url: entry.url,
-      notes: entry.notes,
-      category: entry.category || DEFAULT_CATEGORY,
-      createdAt: now,
-      updatedAt: now
-    }
+    const created = normalizeEntry({ ...entry, id: randomUUID(), createdAt: now, updatedAt: now })
     this.entries.push(created)
     this.persist()
     return { ...created }
@@ -229,6 +277,60 @@ export class Vault {
 
   remove(id: string): void {
     this.entries = this.entries.filter((e) => e.id !== id)
+    this.persist()
+  }
+
+  // ---- categories -----------------------------------------------------------
+
+  listCategories(): Category[] {
+    return this.categories.map((c) => ({ ...c }))
+  }
+
+  /** Create (no id) or update (existing id) a category. */
+  saveCategory(cat: Partial<Category> & { label: string }): Category {
+    if (!this.dek) throw new Error('Vault is locked.')
+    const label = cat.label.trim()
+    if (!label) throw new Error('Category name is required.')
+
+    if (cat.id) {
+      const idx = this.categories.findIndex((c) => c.id === cat.id)
+      if (idx === -1) throw new Error('Category not found.')
+      this.categories[idx] = {
+        ...this.categories[idx],
+        label,
+        color: cat.color ?? this.categories[idx].color,
+        icon: cat.icon ?? this.categories[idx].icon
+      }
+      this.persist()
+      return { ...this.categories[idx] }
+    }
+    const created: Category = {
+      id: randomUUID(),
+      label,
+      color: cat.color || '#94a3b8',
+      icon: cat.icon || 'other'
+    }
+    this.categories.push(created)
+    this.persist()
+    return { ...created }
+  }
+
+  deleteCategory(id: string): void {
+    if (!this.dek) throw new Error('Vault is locked.')
+    const cat = this.categories.find((c) => c.id === id)
+    if (!cat) return
+    if (cat.locked) throw new Error('This category cannot be deleted.')
+    this.categories = this.categories.filter((c) => c.id !== id)
+    // Reassign affected entries to the fallback category.
+    for (const e of this.entries) if (e.category === id) e.category = FALLBACK_CATEGORY
+    this.persist()
+  }
+
+  setCategoryHidden(id: string, hidden: boolean): void {
+    if (!this.dek) throw new Error('Vault is locked.')
+    const cat = this.categories.find((c) => c.id === id)
+    if (!cat) throw new Error('Category not found.')
+    cat.hidden = hidden
     this.persist()
   }
 }

@@ -1,0 +1,56 @@
+appId: com.mrdonleo.passforge
+productName: PassForge
+copyright: Copyright © 2026 Mr-Don-Leo
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - out/**/*
+  - package.json
+
+# ---- macOS ----
+mac:
+  category: public.app-category.utilities
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  icon: build/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+# ---- Windows ----
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+# ---- Linux ----
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Utility
+  maintainer: Mr-Don-Leo
+  icon: build/icon.png
+appImage:
+  artifactName: ${productName}-${version}.${ext}
+
+# ---- Auto-update / publish to GitHub Releases ----
+publish:
+  provider: github
+  owner: Mr-Don-Leo
+  repo: PassForge

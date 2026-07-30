@@ -34,6 +34,7 @@ import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded'
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded'
+import GitHubIcon from '@mui/icons-material/GitHub'
 import { api, categoryById, type AppState, type Category, type ItemType, type VaultEntry } from '../api'
 import { CategoryIcon } from '../categories'
 import { useColorMode } from '../ColorMode'
@@ -120,6 +121,11 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
     onLock()
   }
 
+  // Opens in the user's browser via the main-process window-open handler.
+  const openGitHub = (): void => {
+    window.open('https://github.com/Mr-Don-Leo/PassForge')
+  }
+
   const emptyMessage =
     entries.length === 0
       ? 'Your vault is empty. Add your first item.'
@@ -174,8 +180,10 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Toolbar
         style={dragStyle}
-        sx={{ gap: 1, borderBottom: '1px solid', borderColor: 'divider', pl: isMac ? '80px' : 2, minHeight: 56 }}
+        sx={{ gap: 1, borderBottom: '1px solid', borderColor: 'divider', pl: 2, minHeight: 56 }}
       >
+        {/* Reserve room for the macOS traffic lights (can't be overridden like padding). */}
+        {isMac && <Box sx={{ width: 72, flexShrink: 0 }} />}
         <VpnKeyRoundedIcon color="primary" />
         <Typography variant="h6" sx={{ mr: 2 }}>
           PassForge
@@ -222,11 +230,12 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
             flexShrink: 0,
             borderRight: '1px solid',
             borderColor: 'divider',
-            overflowY: 'auto',
-            py: 1
+            display: 'flex',
+            flexDirection: 'column'
           }}
         >
-          <List dense disablePadding>
+          <Box sx={{ flexGrow: 1, overflowY: 'auto', py: 1 }}>
+            <List dense disablePadding>
             <SidebarRow
               id="all"
               label="All Items"
@@ -259,7 +268,33 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
                 icon={<CategoryIcon icon={c.icon} fontSize="small" />}
               />
             ))}
-          </List>
+            </List>
+          </Box>
+
+          {/* Subtle attribution — links to the repo in the user's browser. */}
+          <Tooltip title="View PassForge on GitHub" placement="top">
+            <Box
+              onClick={openGitHub}
+              sx={{
+                borderTop: '1px solid',
+                borderColor: 'divider',
+                px: 2,
+                py: 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                cursor: 'pointer',
+                color: 'text.disabled',
+                transition: 'color 120ms',
+                '&:hover': { color: 'text.secondary' }
+              }}
+            >
+              <GitHubIcon sx={{ fontSize: 15 }} />
+              <Typography variant="caption" noWrap>
+                Mr-Don-Leo
+              </Typography>
+            </Box>
+          </Tooltip>
         </Box>
 
         {/* Entry list */}

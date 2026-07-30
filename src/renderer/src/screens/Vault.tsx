@@ -178,12 +178,13 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* macOS: a draggable strip above the header gives the traffic lights their
+          own space instead of pushing the logo/title sideways. */}
+      {isMac && <Box style={dragStyle} sx={{ height: 30, flexShrink: 0 }} />}
       <Toolbar
         style={dragStyle}
         sx={{ gap: 1, borderBottom: '1px solid', borderColor: 'divider', pl: 2, minHeight: 56 }}
       >
-        {/* Reserve room for the macOS traffic lights (can't be overridden like padding). */}
-        {isMac && <Box sx={{ width: 72, flexShrink: 0 }} />}
         <VpnKeyRoundedIcon color="primary" />
         <Typography variant="h6" sx={{ mr: 2 }}>
           PassForge

@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { deriveKey, KDF, open, randomBytes, seal, type Sealed } from './crypto'
 import { biometricAvailable, promptBiometric, unwrapWithOS, wrapWithOS } from './biometric'
-import type { PasswordOptions, VaultEntry } from '../shared/types'
+import { DEFAULT_CATEGORY, type PasswordOptions, type VaultEntry } from '../shared/types'
 
 /** On-disk vault format. Secrets are only ever stored sealed. */
 interface VaultFile {
@@ -190,7 +190,8 @@ export class Vault {
   // ---- entries CRUD ---------------------------------------------------------
 
   list(): VaultEntry[] {
-    return this.entries.map((e) => ({ ...e }))
+    // Default legacy entries that predate categories.
+    return this.entries.map((e) => ({ ...e, category: e.category || DEFAULT_CATEGORY }))
   }
 
   private persist(): void {
@@ -217,6 +218,7 @@ export class Vault {
       password: entry.password,
       url: entry.url,
       notes: entry.notes,
+      category: entry.category || DEFAULT_CATEGORY,
       createdAt: now,
       updatedAt: now
     }

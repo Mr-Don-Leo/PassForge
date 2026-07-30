@@ -9,6 +9,7 @@ import {
   DialogTitle,
   IconButton,
   InputAdornment,
+  MenuItem,
   Slider,
   Stack,
   TextField,
@@ -21,20 +22,22 @@ import AutorenewIcon from '@mui/icons-material/Autorenew'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import TuneIcon from '@mui/icons-material/Tune'
-import { api, type PasswordOptions, type VaultEntry } from '../api'
+import { api, CATEGORIES, DEFAULT_CATEGORY, type PasswordOptions, type VaultEntry } from '../api'
+import { CategoryIcon } from '../categories'
 
 type Draft = Omit<VaultEntry, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
 
-const EMPTY: Draft = { title: '', username: '', password: '', url: '', notes: '' }
+const EMPTY: Draft = { title: '', username: '', password: '', url: '', notes: '', category: DEFAULT_CATEGORY }
 
 interface Props {
   open: boolean
   entry: VaultEntry | null
+  defaultCategory?: string
   onClose: () => void
   onSaved: () => void
 }
 
-export default function EntryDialog({ open, entry, onClose, onSaved }: Props): JSX.Element {
+export default function EntryDialog({ open, entry, defaultCategory, onClose, onSaved }: Props): JSX.Element {
   const [draft, setDraft] = useState<Draft>(EMPTY)
   const [show, setShow] = useState(false)
   const [showGen, setShowGen] = useState(false)
@@ -49,11 +52,11 @@ export default function EntryDialog({ open, entry, onClose, onSaved }: Props): J
 
   useEffect(() => {
     if (open) {
-      setDraft(entry ? { ...entry } : EMPTY)
+      setDraft(entry ? { ...entry } : { ...EMPTY, category: defaultCategory || DEFAULT_CATEGORY })
       setShow(false)
       setShowGen(false)
     }
-  }, [open, entry])
+  }, [open, entry, defaultCategory])
 
   const set = (k: keyof Draft, v: string): void => setDraft((d) => ({ ...d, [k]: v }))
 
@@ -77,6 +80,21 @@ export default function EntryDialog({ open, entry, onClose, onSaved }: Props): J
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField label="Title" value={draft.title} autoFocus onChange={(e) => set('title', e.target.value)} />
+          <TextField
+            select
+            label="Category"
+            value={draft.category}
+            onChange={(e) => set('category', e.target.value)}
+          >
+            {CATEGORIES.map((c) => (
+              <MenuItem key={c.id} value={c.id}>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <CategoryIcon id={c.id} fontSize="small" sx={{ color: c.color }} />
+                  <span>{c.label}</span>
+                </Stack>
+              </MenuItem>
+            ))}
+          </TextField>
           <TextField label="Username or email" value={draft.username} onChange={(e) => set('username', e.target.value)} />
           <TextField
             label="Password"

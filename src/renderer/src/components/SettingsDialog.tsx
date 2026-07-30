@@ -10,9 +10,12 @@ import {
   FormControlLabel,
   Stack,
   Switch,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography
 } from '@mui/material'
 import { api, type AppState } from '../api'
+import { useColorMode, type ThemePref } from '../ColorMode'
 import PasscodeInput from './PasscodeInput'
 
 interface Props {
@@ -26,6 +29,7 @@ export default function SettingsDialog({ open, state, onClose, onChange }: Props
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [msg, setMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  const { pref, setPref } = useColorMode()
 
   const toggleBiometric = async (enabled: boolean): Promise<void> => {
     const res = enabled ? await api.enrollBiometric() : await api.disableBiometric()
@@ -54,6 +58,24 @@ export default function SettingsDialog({ open, state, onClose, onChange }: Props
               {msg.text}
             </Alert>
           )}
+
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              Appearance
+            </Typography>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={pref}
+              onChange={(_, v: ThemePref | null) => v && setPref(v)}
+            >
+              <ToggleButton value="light">Light</ToggleButton>
+              <ToggleButton value="dark">Dark</ToggleButton>
+              <ToggleButton value="system">System</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+
+          <Divider />
 
           <Box>
             <Typography variant="subtitle2" gutterBottom>

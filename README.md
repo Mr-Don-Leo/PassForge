@@ -18,6 +18,8 @@ Material-design UI · biometric + 6-digit passcode unlock · AES-256-GCM encrypt
   - **6-digit passcode** — hardened with a memory-hard KDF and escalating lockout after repeated failures.
 - **Strong crypto.** A random 256-bit Data Encryption Key encrypts the vault with AES-256-GCM. The key is wrapped independently by (1) a scrypt-derived key from your passcode and (2) the OS keychain, released only after a successful biometric prompt.
 - **Built-in password generator** with adjustable length and character sets.
+- **Categories** — organise items (Logins, Email, Social, Finance, Work, Shopping, Personal, Other) and browse them from the sidebar.
+- **Light & dark themes** with a system-follow option, toggled from the toolbar or Settings.
 - **Minimal Material UI** — search, add/edit/delete items, one-click copy.
 - **Hardened Electron shell** — sandboxed renderer, context isolation, no Node in the UI, strict CSP, no remote content.
 

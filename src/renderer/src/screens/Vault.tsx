@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import {
   Avatar,
   Box,
@@ -8,8 +8,8 @@ import {
   InputAdornment,
   List,
   ListItem,
-  ListItemAvatar,
   ListItemButton,
+  ListItemIcon,
   ListItemText,
   Snackbar,
   Stack,
@@ -18,14 +18,20 @@ import {
   Tooltip,
   Typography
 } from '@mui/material'
-import AddIcon from '@mui/icons-material/Add'
-import SearchIcon from '@mui/icons-material/Search'
-import LockIcon from '@mui/icons-material/Lock'
-import SettingsIcon from '@mui/icons-material/Settings'
-import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import KeyIcon from '@mui/icons-material/Key'
-import { api, type AppState, type VaultEntry } from '../api'
+import { alpha } from '@mui/material/styles'
+import AddRoundedIcon from '@mui/icons-material/AddRounded'
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded'
+import LockRoundedIcon from '@mui/icons-material/LockRounded'
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
+import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded'
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
+import VpnKeyRoundedIcon from '@mui/icons-material/VpnKeyRounded'
+import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded'
+import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
+import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
+import { api, CATEGORIES, categoryById, DEFAULT_CATEGORY, type AppState, type VaultEntry } from '../api'
+import { CategoryIcon } from '../categories'
+import { useColorMode } from '../ColorMode'
 import EntryDialog from '../components/EntryDialog'
 import SettingsDialog from '../components/SettingsDialog'
 
@@ -35,13 +41,18 @@ interface Props {
   onStateChange: () => void
 }
 
+const SIDEBAR_WIDTH = 232
+
 export default function VaultScreen({ state, onLock, onStateChange }: Props): JSX.Element {
   const [entries, setEntries] = useState<VaultEntry[]>([])
   const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState<string>('all')
   const [editing, setEditing] = useState<VaultEntry | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [toast, setToast] = useState('')
+  const { resolved, toggle } = useColorMode()
+  const isMac = state.platform === 'darwin'
 
   const load = useCallback(async () => {
     const res = await api.listEntries()
@@ -52,13 +63,19 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
     load()
   }, [load])
 
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {}
+    for (const e of entries) c[e.category] = (c[e.category] || 0) + 1
+    return c
+  }, [entries])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const list = q
-      ? entries.filter((e) => `${e.title} ${e.username} ${e.url}`.toLowerCase().includes(q))
-      : entries
+    let list = entries
+    if (selected !== 'all') list = list.filter((e) => e.category === selected)
+    if (q) list = list.filter((e) => `${e.title} ${e.username} ${e.url}`.toLowerCase().includes(q))
     return [...list].sort((a, b) => a.title.localeCompare(b.title))
-  }, [entries, query])
+  }, [entries, query, selected])
 
   const copy = async (text: string, label: string): Promise<void> => {
     await navigator.clipboard.writeText(text)
@@ -85,10 +102,69 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
     onLock()
   }
 
+  const emptyMessage =
+    entries.length === 0
+      ? 'Your vault is empty. Add your first item.'
+      : query.trim()
+        ? 'No matches.'
+        : 'No items in this category.'
+
+  const SidebarRow = ({
+    id,
+    label,
+    color,
+    count,
+    icon
+  }: {
+    id: string
+    label: string
+    color: string
+    count: number
+    icon: JSX.Element
+  }): JSX.Element => {
+    const active = selected === id
+    return (
+      <ListItemButton
+        selected={active}
+        onClick={() => setSelected(id)}
+        sx={{
+          mx: 1,
+          my: 0.25,
+          borderRadius: 2,
+          '&.Mui-selected': { bgcolor: alpha(color, 0.16) },
+          '&.Mui-selected:hover': { bgcolor: alpha(color, 0.22) }
+        }}
+      >
+        <ListItemIcon sx={{ minWidth: 34, color }}>{icon}</ListItemIcon>
+        <ListItemText
+          primary={label}
+          primaryTypographyProps={{ variant: 'body2', fontWeight: active ? 700 : 500 }}
+        />
+        {count > 0 && (
+          <Typography variant="caption" color="text.secondary">
+            {count}
+          </Typography>
+        )}
+      </ListItemButton>
+    )
+  }
+
+  const dragStyle = { WebkitAppRegion: 'drag' } as CSSProperties
+  const noDragStyle = { WebkitAppRegion: 'no-drag' } as CSSProperties
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Toolbar sx={{ gap: 1, borderBottom: '1px solid', borderColor: 'divider', WebkitAppRegion: 'drag' } as never}>
-        <KeyIcon color="primary" />
+      <Toolbar
+        style={dragStyle}
+        sx={{
+          gap: 1,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          pl: isMac ? '80px' : 2,
+          minHeight: 56
+        }}
+      >
+        <VpnKeyRoundedIcon color="primary" />
         <Typography variant="h6" sx={{ mr: 2 }}>
           PassForge
         </Typography>
@@ -96,109 +172,175 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
           placeholder="Search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          sx={{ flexGrow: 1, maxWidth: 420, WebkitAppRegion: 'no-drag' } as never}
+          style={noDragStyle}
+          sx={{ flexGrow: 1, maxWidth: 420 }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
+                <SearchRoundedIcon fontSize="small" />
               </InputAdornment>
             )
           }}
         />
         <Box sx={{ flexGrow: 1 }} />
-        <Box sx={{ WebkitAppRegion: 'no-drag' } as never}>
+        <Box style={noDragStyle}>
+          <Tooltip title={resolved === 'dark' ? 'Light mode' : 'Dark mode'}>
+            <IconButton onClick={toggle}>
+              {resolved === 'dark' ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Settings">
             <IconButton onClick={() => setSettingsOpen(true)}>
-              <SettingsIcon />
+              <SettingsRoundedIcon />
             </IconButton>
           </Tooltip>
           <Tooltip title="Lock vault">
             <IconButton onClick={lock}>
-              <LockIcon />
+              <LockRoundedIcon />
             </IconButton>
           </Tooltip>
         </Box>
       </Toolbar>
 
-      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-        {filtered.length === 0 ? (
-          <Stack sx={{ height: '100%', minHeight: 300 }} alignItems="center" justifyContent="center" spacing={1}>
-            <KeyIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
-            <Typography color="text.secondary">
-              {entries.length === 0 ? 'Your vault is empty. Add your first item.' : 'No matches.'}
+      <Box sx={{ flexGrow: 1, display: 'flex', minHeight: 0 }}>
+        {/* Category sidebar */}
+        <Box
+          sx={{
+            width: SIDEBAR_WIDTH,
+            flexShrink: 0,
+            borderRight: '1px solid',
+            borderColor: 'divider',
+            overflowY: 'auto',
+            py: 1
+          }}
+        >
+          <List dense disablePadding>
+            <SidebarRow
+              id="all"
+              label="All Items"
+              color={resolved === 'dark' ? '#7c9cff' : '#3b5bdb'}
+              count={entries.length}
+              icon={<Inventory2RoundedIcon fontSize="small" />}
+            />
+            <Typography
+              variant="overline"
+              color="text.secondary"
+              sx={{ px: 2.5, pt: 1.5, pb: 0.5, display: 'block' }}
+            >
+              Categories
             </Typography>
-          </Stack>
-        ) : (
-          <List sx={{ maxWidth: 780, mx: 'auto', py: 2 }}>
-            {filtered.map((entry) => (
-              <ListItem
-                key={entry.id}
-                disablePadding
-                sx={{ mb: 1 }}
-                secondaryAction={
-                  <Stack direction="row" spacing={0.5}>
-                    <Tooltip title="Copy username">
-                      <span>
-                        <IconButton
-                          size="small"
-                          disabled={!entry.username}
-                          onClick={() => copy(entry.username, 'Username')}
-                        >
-                          <ContentCopyIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title="Copy password">
-                      <span>
-                        <IconButton
-                          size="small"
-                          disabled={!entry.password}
-                          onClick={() => copy(entry.password, 'Password')}
-                        >
-                          <KeyIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton size="small" onClick={() => remove(entry.id)}>
-                        <DeleteOutlineIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </Stack>
-                }
-              >
-                <ListItemButton
-                  onClick={() => openEdit(entry)}
-                  sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', pr: 14 }}
-                >
-                  <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: 'background.default', color: 'primary.main' }}>
-                      {(entry.title[0] || '?').toUpperCase()}
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={entry.title}
-                    secondary={
-                      <Stack direction="row" spacing={1} alignItems="center" component="span">
-                        <span>{entry.username || '—'}</span>
-                        {entry.url && <Chip size="small" label={entry.url} variant="outlined" />}
-                      </Stack>
-                    }
-                  />
-                </ListItemButton>
-              </ListItem>
+            {CATEGORIES.map((c) => (
+              <SidebarRow
+                key={c.id}
+                id={c.id}
+                label={c.label}
+                color={c.color}
+                count={counts[c.id] || 0}
+                icon={<CategoryIcon id={c.id} fontSize="small" />}
+              />
             ))}
           </List>
-        )}
-      </Box>
+        </Box>
 
-      <Fab color="primary" onClick={openNew} sx={{ position: 'absolute', right: 28, bottom: 28 }}>
-        <AddIcon />
-      </Fab>
+        {/* Entry list */}
+        <Box sx={{ flexGrow: 1, overflowY: 'auto', position: 'relative' }}>
+          {filtered.length === 0 ? (
+            <Stack sx={{ height: '100%', minHeight: 320 }} alignItems="center" justifyContent="center" spacing={1.5}>
+              <VpnKeyRoundedIcon sx={{ fontSize: 52, color: 'text.disabled' }} />
+              <Typography color="text.secondary">{emptyMessage}</Typography>
+            </Stack>
+          ) : (
+            <List sx={{ maxWidth: 720, mx: 'auto', p: 2 }}>
+              {filtered.map((entry) => {
+                const cat = categoryById(entry.category)
+                return (
+                  <ListItem
+                    key={entry.id}
+                    disablePadding
+                    sx={{ mb: 1 }}
+                    secondaryAction={
+                      <Stack direction="row" spacing={0.5}>
+                        <Tooltip title="Copy username">
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={!entry.username}
+                              onClick={() => copy(entry.username, 'Username')}
+                            >
+                              <ContentCopyRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title="Copy password">
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={!entry.password}
+                              onClick={() => copy(entry.password, 'Password')}
+                            >
+                              <VpnKeyRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton size="small" onClick={() => remove(entry.id)}>
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    }
+                  >
+                    <ListItemButton
+                      onClick={() => openEdit(entry)}
+                      sx={{ borderRadius: 2.5, border: '1px solid', borderColor: 'divider', pr: 14, py: 1.25 }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 52 }}>
+                        <Avatar
+                          variant="rounded"
+                          sx={{ bgcolor: alpha(cat.color, 0.16), color: cat.color, width: 40, height: 40 }}
+                        >
+                          <CategoryIcon id={entry.category} fontSize="small" />
+                        </Avatar>
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={entry.title}
+                        primaryTypographyProps={{ fontWeight: 600 }}
+                        secondary={
+                          <Stack direction="row" spacing={0.75} alignItems="center" component="span" sx={{ mt: 0.25 }}>
+                            <Chip
+                              size="small"
+                              label={cat.label}
+                              sx={{
+                                height: 20,
+                                bgcolor: alpha(cat.color, 0.16),
+                                color: cat.color,
+                                fontWeight: 600,
+                                '& .MuiChip-label': { px: 1 }
+                              }}
+                            />
+                            <Typography variant="body2" color="text.secondary" component="span" noWrap>
+                              {entry.username || '—'}
+                            </Typography>
+                          </Stack>
+                        }
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                )
+              })}
+            </List>
+          )}
+
+          <Fab color="primary" onClick={openNew} sx={{ position: 'absolute', right: 28, bottom: 28 }}>
+            <AddRoundedIcon />
+          </Fab>
+        </Box>
+      </Box>
 
       <EntryDialog
         open={dialogOpen}
         entry={editing}
+        defaultCategory={selected !== 'all' ? selected : DEFAULT_CATEGORY}
         onClose={() => setDialogOpen(false)}
         onSaved={() => {
           setDialogOpen(false)

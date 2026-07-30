@@ -1,6 +1,6 @@
 {
   "name": "passforge",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "PassForge — a minimalist, local-first password manager with biometric and passcode unlock.",
   "author": "Mr-Don-Leo",
   "license": "MIT",

@@ -36,7 +36,9 @@ jobs:
         run: npm ci
 
       - name: Build & package
-        run: npm run ${{ matrix.script }}
+        # `--publish never` stops electron-builder from auto-publishing on the
+        # tag (which would require GH_TOKEN here); the release job below does it.
+        run: npm run ${{ matrix.script }} -- --publish never
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

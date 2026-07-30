@@ -28,8 +28,10 @@ export default function Onboarding({ state, onDone }: Props): JSX.Element {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const create = async (): Promise<void> => {
-    if (passcode !== confirm) {
+  // `confirmValue` comes from the input's onComplete so we compare the just-typed
+  // value rather than the React state, which may not have flushed yet.
+  const create = async (confirmValue: string = confirm): Promise<void> => {
+    if (passcode !== confirmValue) {
       setError('The passcodes do not match.')
       setConfirm('')
       return
@@ -102,7 +104,7 @@ export default function Onboarding({ state, onDone }: Props): JSX.Element {
             <Fade in>
               <Stack spacing={3} sx={{ width: '100%' }} alignItems="center">
                 <Typography variant="subtitle1">Confirm your passcode</Typography>
-                <PasscodeInput value={confirm} autoFocus onChange={setConfirm} onComplete={create} />
+                <PasscodeInput value={confirm} autoFocus onChange={setConfirm} onComplete={(v) => create(v)} />
 
                 {state.biometricAvailable && (
                   <FormControlLabel
@@ -123,7 +125,7 @@ export default function Onboarding({ state, onDone }: Props): JSX.Element {
                   size="large"
                   fullWidth
                   disabled={confirm.length !== 6 || busy}
-                  onClick={create}
+                  onClick={() => create()}
                 >
                   {busy ? 'Creating vault…' : 'Create vault'}
                 </Button>

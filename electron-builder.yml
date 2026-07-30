@@ -42,7 +42,6 @@ nsis:
 linux:
   target:
     - AppImage
-    - deb
   category: Utility
   maintainer: Mr-Don-Leo
   icon: build/icon.png

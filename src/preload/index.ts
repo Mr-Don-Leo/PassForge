@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppState, PasswordOptions, Result, SetupOptions, VaultEntry } from '../shared/types'
+import type { AppState, Category, PasswordOptions, Result, SetupOptions, VaultEntry } from '../shared/types'
 
 /**
  * The single, minimal surface exposed to the renderer. The renderer has no
@@ -22,7 +22,13 @@ const api = {
   ): Promise<Result<VaultEntry>> => ipcRenderer.invoke('vault:save', entry),
   deleteEntry: (id: string): Promise<Result> => ipcRenderer.invoke('vault:delete', id),
   generatePassword: (opts: PasswordOptions): Promise<Result<string>> =>
-    ipcRenderer.invoke('util:generatePassword', opts)
+    ipcRenderer.invoke('util:generatePassword', opts),
+  listCategories: (): Promise<Result<Category[]>> => ipcRenderer.invoke('categories:list'),
+  saveCategory: (cat: Partial<Category> & { label: string }): Promise<Result<Category>> =>
+    ipcRenderer.invoke('categories:save', cat),
+  deleteCategory: (id: string): Promise<Result> => ipcRenderer.invoke('categories:delete', id),
+  setCategoryHidden: (id: string, hidden: boolean): Promise<Result> =>
+    ipcRenderer.invoke('categories:setHidden', id, hidden)
 }
 
 export type PassforgeApi = typeof api

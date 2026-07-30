@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import { Vault, generatePassword } from './vault'
 import { biometricAvailable } from './biometric'
-import type { AppState, PasswordOptions, Result, SetupOptions, VaultEntry } from '../shared/types'
+import type { AppState, Category, PasswordOptions, Result, SetupOptions, VaultEntry } from '../shared/types'
 
 const vault = new Vault()
 
@@ -79,6 +79,42 @@ export function registerIpc(): void {
 
   ipcMain.handle('util:generatePassword', (_e, opts: PasswordOptions): Result<string> => {
     return { ok: true, value: generatePassword(opts) }
+  })
+
+  // ---- categories -----------------------------------------------------------
+
+  ipcMain.handle('categories:list', (): Result<Category[]> => {
+    if (!vault.isUnlocked()) return { ok: false, error: 'Vault is locked.' }
+    return { ok: true, value: vault.listCategories() }
+  })
+
+  ipcMain.handle('categories:save', (_e, cat: Partial<Category> & { label: string }): Result<Category> => {
+    if (!vault.isUnlocked()) return { ok: false, error: 'Vault is locked.' }
+    try {
+      return { ok: true, value: vault.saveCategory(cat) }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('categories:delete', (_e, id: string): Result => {
+    if (!vault.isUnlocked()) return { ok: false, error: 'Vault is locked.' }
+    try {
+      vault.deleteCategory(id)
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('categories:setHidden', (_e, id: string, hidden: boolean): Result => {
+    if (!vault.isUnlocked()) return { ok: false, error: 'Vault is locked.' }
+    try {
+      vault.setCategoryHidden(id, Boolean(hidden))
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
   })
 }
 

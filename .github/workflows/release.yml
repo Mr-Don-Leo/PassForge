@@ -36,9 +36,10 @@ jobs:
         run: npm ci
 
       - name: Build & package
-        run: npm run ${{ matrix.script }}
+        # `--publish always` uploads the installers to the GitHub Release for
+        # the current tag (electron-builder creates it as a draft to review).
+        run: npm run ${{ matrix.script }} -- --publish always
         env:
-          # electron-builder publishes to the release for the pushed tag.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts

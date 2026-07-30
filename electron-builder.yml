@@ -54,3 +54,4 @@ publish:
   provider: github
   owner: Mr-Don-Leo
   repo: PassForge
+  releaseType: release

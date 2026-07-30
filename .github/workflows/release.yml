@@ -49,8 +49,7 @@ jobs:
             release/*.zip
             release/*.exe
             release/*.AppImage
-            release/*.deb
-            release/*.yml
+            release/latest*.yml
             release/*.blockmap
           if-no-files-found: ignore
 
@@ -72,8 +71,8 @@ jobs:
           set -euo pipefail
           mapfile -t files < <(find dist -type f \
             \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' \
-               -o -name '*.AppImage' -o -name '*.deb' \
-               -o -name '*.yml' -o -name '*.blockmap' \))
+               -o -name '*.AppImage' -o -name 'latest*.yml' \
+               -o -name '*.blockmap' \) ! -name 'builder-debug.yml')
           echo "Publishing ${#files[@]} files:"
           printf ' - %s\n' "${files[@]}"
           if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
@@ -82,5 +81,5 @@ jobs:
             gh release create "${GITHUB_REF_NAME}" "${files[@]}" \
               --repo "${GITHUB_REPOSITORY}" \
               --title "PassForge ${GITHUB_REF_NAME}" \
-              --notes "Automated release of PassForge ${GITHUB_REF_NAME}. Download the installer for your platform below (macOS .dmg, Windows .exe, Linux .AppImage/.deb)."
+              --notes "Automated release of PassForge ${GITHUB_REF_NAME}. Download the installer for your platform below (macOS .dmg, Windows .exe, Linux .AppImage)."
           fi

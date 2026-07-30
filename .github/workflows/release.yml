@@ -1,6 +1,6 @@
 name: Release
 
-# Build installers for macOS, Windows and Linux and publish them to a
+# Build installers for macOS, Windows and Linux, then publish them to a single
 # GitHub Release whenever a version tag (e.g. v0.1.0) is pushed.
 on:
   push:
@@ -36,13 +36,9 @@ jobs:
         run: npm ci
 
       - name: Build & package
-        # `--publish always` uploads the installers to the GitHub Release for
-        # the current tag (electron-builder creates it as a draft to review).
-        run: npm run ${{ matrix.script }} -- --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run ${{ matrix.script }}
 
-      - name: Upload artifacts
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: passforge-${{ matrix.os }}
@@ -52,5 +48,37 @@ jobs:
             release/*.exe
             release/*.AppImage
             release/*.deb
-            release/latest*.yml
+            release/*.yml
+            release/*.blockmap
           if-no-files-found: ignore
+
+  release:
+    needs: build
+    # Only publish a release for tag pushes, not manual/dispatch builds.
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find dist -type f \
+            \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' \
+               -o -name '*.AppImage' -o -name '*.deb' \
+               -o -name '*.yml' -o -name '*.blockmap' \))
+          echo "Publishing ${#files[@]} files:"
+          printf ' - %s\n' "${files[@]}"
+          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "${files[@]}" --clobber --repo "${GITHUB_REPOSITORY}"
+          else
+            gh release create "${GITHUB_REF_NAME}" "${files[@]}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "PassForge ${GITHUB_REF_NAME}" \
+              --notes "Automated release of PassForge ${GITHUB_REF_NAME}. Download the installer for your platform below (macOS .dmg, Windows .exe, Linux .AppImage/.deb)."
+          fi

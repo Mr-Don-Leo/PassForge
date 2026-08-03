@@ -105,7 +105,7 @@ export default function SettingsDialog({ open, state, onClose, onChange, onReque
             <Typography variant="subtitle2" gutterBottom>
               Auto-lock
             </Typography>
-            <Stack spacing={1.5}>
+            <Stack spacing={1.5} sx={{ mt: 1.5 }}>
               <TextField
                 select
                 size="small"

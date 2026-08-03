@@ -1,5 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppState, Category, PasswordOptions, Result, SetupOptions, VaultEntry } from '../shared/types'
+import type {
+  AppState,
+  AutoLockSettings,
+  Category,
+  ImportResult,
+  PasswordOptions,
+  Result,
+  SetupOptions,
+  VaultEntry
+} from '../shared/types'
 
 /**
  * The single, minimal surface exposed to the renderer. The renderer has no
@@ -28,7 +37,24 @@ const api = {
     ipcRenderer.invoke('categories:save', cat),
   deleteCategory: (id: string): Promise<Result> => ipcRenderer.invoke('categories:delete', id),
   setCategoryHidden: (id: string, hidden: boolean): Promise<Result> =>
-    ipcRenderer.invoke('categories:setHidden', id, hidden)
+    ipcRenderer.invoke('categories:setHidden', id, hidden),
+  toggleFavorite: (id: string): Promise<Result<VaultEntry>> => ipcRenderer.invoke('vault:toggleFavorite', id),
+  importOpen: (): Promise<Result<ImportResult | null>> => ipcRenderer.invoke('import:open'),
+  importEntries: (
+    entries: Array<Partial<VaultEntry>>,
+    category: string,
+    skipDuplicates: boolean
+  ): Promise<Result<{ added: number; skipped: number }>> =>
+    ipcRenderer.invoke('vault:importEntries', entries, category, skipDuplicates),
+  getSettings: (): Promise<Result<AutoLockSettings>> => ipcRenderer.invoke('settings:get'),
+  setSettings: (patch: Partial<AutoLockSettings>): Promise<Result<AutoLockSettings>> =>
+    ipcRenderer.invoke('settings:set', patch),
+  /** Subscribe to main-process auto-locks. Returns an unsubscribe function. */
+  onLocked: (cb: () => void): (() => void) => {
+    const listener = (): void => cb()
+    ipcRenderer.on('vault:locked', listener)
+    return () => ipcRenderer.removeListener('vault:locked', listener)
+  }
 }
 
 export type PassforgeApi = typeof api

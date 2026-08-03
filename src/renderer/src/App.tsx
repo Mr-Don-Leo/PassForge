@@ -14,6 +14,9 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     refresh()
+    // The main process locks on OS/app events (sleep, screen-lock, minimize).
+    const unsubscribe = api.onLocked(() => refresh())
+    return unsubscribe
   }, [refresh])
 
   if (!state) {

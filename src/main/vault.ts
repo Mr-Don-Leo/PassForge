@@ -44,11 +44,13 @@ function normalizeEntry(e: Partial<VaultEntry>): VaultEntry {
     type: (e.type as ItemType) || 'password',
     title: e.title ?? '',
     category: e.category || DEFAULT_CATEGORY,
+    favorite: Boolean(e.favorite),
     username: e.username ?? '',
     password: e.password ?? '',
     url: e.url ?? '',
     clientId: e.clientId ?? '',
     secret: e.secret ?? '',
+    expiresAt: e.expiresAt ?? 0,
     notes: e.notes ?? '',
     createdAt: e.createdAt ?? Date.now(),
     updatedAt: e.updatedAt ?? Date.now()
@@ -278,6 +280,51 @@ export class Vault {
   remove(id: string): void {
     this.entries = this.entries.filter((e) => e.id !== id)
     this.persist()
+  }
+
+  toggleFavorite(id: string): VaultEntry {
+    if (!this.dek) throw new Error('Vault is locked.')
+    const e = this.entries.find((x) => x.id === id)
+    if (!e) throw new Error('Entry not found.')
+    e.favorite = !e.favorite
+    e.updatedAt = Date.now()
+    this.persist()
+    return { ...e }
+  }
+
+  /** Bulk-add imported entries. Optionally skip exact duplicates. */
+  importEntries(
+    incoming: Array<Partial<VaultEntry>>,
+    category: string,
+    skipDuplicates: boolean
+  ): { added: number; skipped: number } {
+    if (!this.dek) throw new Error('Vault is locked.')
+    const now = Date.now()
+    const key = (e: { title?: string; username?: string; password?: string }): string =>
+      `${(e.title ?? '').toLowerCase()} ${(e.username ?? '').toLowerCase()} ${e.password ?? ''}`
+    const existing = new Set(this.entries.map((e) => key(e)))
+
+    let added = 0
+    let skipped = 0
+    for (const raw of incoming) {
+      const k = key(raw)
+      if (skipDuplicates && existing.has(k)) {
+        skipped++
+        continue
+      }
+      const created = normalizeEntry({
+        ...raw,
+        id: randomUUID(),
+        category: raw.category || category,
+        createdAt: now,
+        updatedAt: now
+      })
+      this.entries.push(created)
+      existing.add(k)
+      added++
+    }
+    if (added > 0) this.persist()
+    return { added, skipped }
   }
 
   // ---- categories -----------------------------------------------------------

@@ -7,6 +7,7 @@ export interface VaultEntry {
   type: ItemType
   title: string
   category: string
+  favorite: boolean
   // Password items
   username: string
   password: string
@@ -14,10 +15,44 @@ export interface VaultEntry {
   // Secret / API-key items
   clientId: string
   secret: string
+  /** Rotation/expiry date for secrets (epoch ms, 0 = none). */
+  expiresAt: number
   // Common
   notes: string
   createdAt: number
   updatedAt: number
+}
+
+/** User preferences for automatic locking. Not secret; stored outside the vault. */
+export interface AutoLockSettings {
+  /** Lock after N minutes of inactivity (0 = never). */
+  inactivityMinutes: number
+  onSleep: boolean
+  onScreenLock: boolean
+  onMinimize: boolean
+}
+
+export const DEFAULT_AUTOLOCK: AutoLockSettings = {
+  inactivityMinutes: 5,
+  onSleep: true,
+  onScreenLock: true,
+  onMinimize: false
+}
+
+export type ImportFormat =
+  | 'bitwarden-json'
+  | 'bitwarden-csv'
+  | '1password'
+  | 'keepass'
+  | 'chrome'
+  | 'firefox'
+  | 'safari'
+  | 'csv'
+
+export interface ImportResult {
+  format: ImportFormat
+  formatLabel: string
+  entries: Array<Partial<VaultEntry>>
 }
 
 export interface Category {

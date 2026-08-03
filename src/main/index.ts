@@ -1,6 +1,7 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, powerMonitor } from 'electron'
 import { join } from 'node:path'
-import { registerIpc, lockVault } from './ipc'
+import { registerIpc, lockVault, lockAndNotify } from './ipc'
+import { getSettings } from './settings'
 
 const isDev = !app.isPackaged
 
@@ -26,6 +27,11 @@ function createWindow(): void {
 
   win.once('ready-to-show', () => win.show())
 
+  // Auto-lock when the app is minimized (if enabled).
+  win.on('minimize', () => {
+    if (getSettings().onMinimize) lockAndNotify()
+  })
+
   // Open external links in the user's browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://') || url.startsWith('http://')) shell.openExternal(url)
@@ -49,6 +55,15 @@ function createWindow(): void {
 app.whenReady().then(() => {
   registerIpc()
   createWindow()
+
+  // OS-level auto-lock triggers. Sleep and screen-lock (also fired on fast
+  // user-switching) lock the vault and notify the renderer.
+  powerMonitor.on('suspend', () => {
+    if (getSettings().onSleep) lockAndNotify()
+  })
+  powerMonitor.on('lock-screen', () => {
+    if (getSettings().onScreenLock) lockAndNotify()
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

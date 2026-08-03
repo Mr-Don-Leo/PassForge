@@ -20,7 +20,10 @@ Material-design UI · biometric + 6-digit passcode unlock · AES-256-GCM encrypt
 - **Passwords and secrets** — store logins (username/password) or secrets/API keys (client ID + client secret) from one **+** button.
 - **Custom categories** — create your own with a preset icon and colour, rename, hide, or delete the built-in ones; browse by category in the sidebar.
 - **Built-in generator** with adjustable length and character sets, for passwords and secrets.
-- **Light & dark themes** with a system-follow option, toggled from the toolbar or Settings.
+- **Password health dashboard** — on-device scan for reused, weak, similar, old, or incomplete passwords, duplicates, and API keys due for rotation. Never leaves your device.
+- **Import** from Bitwarden (JSON/CSV), 1Password, KeePass, Chrome, Firefox, Safari, or generic CSV — parsed locally.
+- **Auto-lock** on inactivity, sleep, screen-lock/user-switch, minimize, or quit, plus ⌘/Ctrl+L to lock instantly.
+- **Favorites & light/dark themes** with a system-follow option, toggled from the toolbar or Settings.
 - **Minimal Material UI** — search, add/edit/delete items, one-click copy.
 - **Hardened Electron shell** — sandboxed renderer, context isolation, no Node in the UI, strict CSP, no remote content.
 

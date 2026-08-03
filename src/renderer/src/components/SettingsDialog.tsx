@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Alert,
   Box,
@@ -8,13 +8,16 @@ import {
   DialogTitle,
   Divider,
   FormControlLabel,
+  MenuItem,
   Stack,
   Switch,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography
 } from '@mui/material'
-import { api, type AppState } from '../api'
+import FileUploadRoundedIcon from '@mui/icons-material/FileUploadRounded'
+import { api, DEFAULT_AUTOLOCK, type AppState, type AutoLockSettings } from '../api'
 import { useColorMode, type ThemePref } from '../ColorMode'
 import PasscodeInput from './PasscodeInput'
 
@@ -23,13 +26,39 @@ interface Props {
   state: AppState
   onClose: () => void
   onChange: () => void
+  onRequestImport: () => void
 }
 
-export default function SettingsDialog({ open, state, onClose, onChange }: Props): JSX.Element {
+const INACTIVITY_OPTIONS = [
+  { v: 0, label: 'Never' },
+  { v: 1, label: '1 minute' },
+  { v: 5, label: '5 minutes' },
+  { v: 15, label: '15 minutes' },
+  { v: 30, label: '30 minutes' },
+  { v: 60, label: '1 hour' }
+]
+
+export default function SettingsDialog({ open, state, onClose, onChange, onRequestImport }: Props): JSX.Element {
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [msg, setMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  const [lock, setLock] = useState<AutoLockSettings>(DEFAULT_AUTOLOCK)
   const { pref, setPref } = useColorMode()
+
+  useEffect(() => {
+    if (open) {
+      api.getSettings().then((r) => {
+        if (r.ok) setLock(r.value)
+      })
+    }
+  }, [open])
+
+  const updateLock = async (patch: Partial<AutoLockSettings>): Promise<void> => {
+    const optimistic = { ...lock, ...patch }
+    setLock(optimistic)
+    const r = await api.setSettings(patch)
+    if (r.ok) setLock(r.value)
+  }
 
   const toggleBiometric = async (enabled: boolean): Promise<void> => {
     const res = enabled ? await api.enrollBiometric() : await api.disableBiometric()
@@ -63,16 +92,63 @@ export default function SettingsDialog({ open, state, onClose, onChange }: Props
             <Typography variant="subtitle2" gutterBottom>
               Appearance
             </Typography>
-            <ToggleButtonGroup
-              size="small"
-              exclusive
-              value={pref}
-              onChange={(_, v: ThemePref | null) => v && setPref(v)}
-            >
+            <ToggleButtonGroup size="small" exclusive value={pref} onChange={(_, v: ThemePref | null) => v && setPref(v)}>
               <ToggleButton value="light">Light</ToggleButton>
               <ToggleButton value="dark">Dark</ToggleButton>
               <ToggleButton value="system">System</ToggleButton>
             </ToggleButtonGroup>
+          </Box>
+
+          <Divider />
+
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              Auto-lock
+            </Typography>
+            <Stack spacing={1.5}>
+              <TextField
+                select
+                size="small"
+                label="After inactivity"
+                value={lock.inactivityMinutes}
+                onChange={(e) => updateLock({ inactivityMinutes: Number(e.target.value) })}
+              >
+                {INACTIVITY_OPTIONS.map((o) => (
+                  <MenuItem key={o.v} value={o.v}>
+                    {o.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <FormControlLabel
+                control={<Switch checked={lock.onSleep} onChange={(e) => updateLock({ onSleep: e.target.checked })} />}
+                label={<Typography variant="body2">When the computer sleeps</Typography>}
+              />
+              <FormControlLabel
+                control={<Switch checked={lock.onScreenLock} onChange={(e) => updateLock({ onScreenLock: e.target.checked })} />}
+                label={<Typography variant="body2">When the screen locks or user switches</Typography>}
+              />
+              <FormControlLabel
+                control={<Switch checked={lock.onMinimize} onChange={(e) => updateLock({ onMinimize: e.target.checked })} />}
+                label={<Typography variant="body2">When the app is minimized</Typography>}
+              />
+              <Typography variant="caption" color="text.secondary">
+                The vault always locks on quit. Press ⌘/Ctrl+L to lock instantly.
+              </Typography>
+            </Stack>
+          </Box>
+
+          <Divider />
+
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              Import
+            </Typography>
+            <Button variant="outlined" startIcon={<FileUploadRoundedIcon />} onClick={onRequestImport}>
+              Import from another app
+            </Button>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              Bitwarden, 1Password, KeePass, Chrome, Firefox, Safari, or a generic CSV. Parsed locally.
+            </Typography>
           </Box>
 
           <Divider />
@@ -108,11 +184,7 @@ export default function SettingsDialog({ open, state, onClose, onChange }: Props
                 New
               </Typography>
               <PasscodeInput value={next} onChange={setNext} />
-              <Button
-                variant="contained"
-                disabled={current.length !== 6 || next.length !== 6}
-                onClick={changePasscode}
-              >
+              <Button variant="contained" disabled={current.length !== 6 || next.length !== 6} onClick={changePasscode}>
                 Update passcode
               </Button>
             </Stack>

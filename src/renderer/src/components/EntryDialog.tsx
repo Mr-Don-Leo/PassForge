@@ -22,6 +22,8 @@ import AutorenewIcon from '@mui/icons-material/Autorenew'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import TuneIcon from '@mui/icons-material/Tune'
+import StarRoundedIcon from '@mui/icons-material/StarRounded'
+import StarBorderRoundedIcon from '@mui/icons-material/StarBorderRounded'
 import {
   api,
   DEFAULT_CATEGORY,
@@ -39,11 +41,13 @@ const EMPTY: Draft = {
   type: 'password',
   title: '',
   category: DEFAULT_CATEGORY,
+  favorite: false,
   username: '',
   password: '',
   url: '',
   clientId: '',
   secret: '',
+  expiresAt: 0,
   notes: ''
 }
 
@@ -119,8 +123,15 @@ export default function EntryDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>
-        {entry ? 'Edit' : 'New'} {isSecret ? 'secret' : 'item'}
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span>
+          {entry ? 'Edit' : 'New'} {isSecret ? 'secret' : 'item'}
+        </span>
+        <Tooltip title={draft.favorite ? 'Unfavorite' : 'Add to favorites'}>
+          <IconButton onClick={() => setDraft((d) => ({ ...d, favorite: !d.favorite }))}>
+            {draft.favorite ? <StarRoundedIcon sx={{ color: '#f5b301' }} /> : <StarBorderRoundedIcon />}
+          </IconButton>
+        </Tooltip>
       </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
@@ -221,6 +232,17 @@ export default function EntryDialog({
             value={draft.url}
             onChange={(e) => set('url', e.target.value)}
           />
+          {isSecret && (
+            <TextField
+              label="Expires / rotate by (optional)"
+              type="date"
+              value={draft.expiresAt ? new Date(draft.expiresAt).toISOString().slice(0, 10) : ''}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, expiresAt: e.target.value ? new Date(e.target.value).getTime() : 0 }))
+              }
+              InputLabelProps={{ shrink: true }}
+            />
+          )}
           <TextField label="Notes" value={draft.notes} onChange={(e) => set('notes', e.target.value)} multiline minRows={2} />
         </Stack>
       </DialogContent>

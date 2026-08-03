@@ -35,12 +35,18 @@ import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded'
 import GitHubIcon from '@mui/icons-material/GitHub'
-import { api, categoryById, type AppState, type Category, type ItemType, type VaultEntry } from '../api'
+import StarRoundedIcon from '@mui/icons-material/StarRounded'
+import StarBorderRoundedIcon from '@mui/icons-material/StarBorderRounded'
+import ShieldRoundedIcon from '@mui/icons-material/ShieldRounded'
+import { api, categoryById, type AppState, type Category, type ImportResult, type ItemType, type VaultEntry } from '../api'
+import { analyze } from '../health'
 import { CategoryIcon } from '../categories'
 import { useColorMode } from '../ColorMode'
 import EntryDialog from '../components/EntryDialog'
 import SettingsDialog from '../components/SettingsDialog'
 import CategoryManager from '../components/CategoryManager'
+import HealthDashboard from '../components/HealthDashboard'
+import ImportDialog from '../components/ImportDialog'
 
 interface Props {
   state: AppState
@@ -61,9 +67,11 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [managerOpen, setManagerOpen] = useState(false)
   const [addAnchor, setAddAnchor] = useState<null | HTMLElement>(null)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [toast, setToast] = useState('')
   const { resolved, toggle } = useColorMode()
   const isMac = state.platform === 'darwin'
+  const showHealth = selected === 'health'
 
   const load = useCallback(async () => {
     const [e, c] = await Promise.all([api.listEntries(), api.listCategories()])
@@ -82,11 +90,14 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
   }, [entries])
 
   const visibleCategories = useMemo(() => categories.filter((c) => !c.hidden), [categories])
+  const favoritesCount = useMemo(() => entries.filter((e) => e.favorite).length, [entries])
+  const healthIssues = useMemo(() => analyze(entries, Date.now()).issueCount, [entries])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     let list = entries
-    if (selected !== 'all') list = list.filter((e) => e.category === selected)
+    if (selected === 'favorites') list = list.filter((e) => e.favorite)
+    else if (selected !== 'all') list = list.filter((e) => e.category === selected)
     if (q)
       list = list.filter((e) =>
         `${e.title} ${e.username} ${e.clientId} ${e.url}`.toLowerCase().includes(q)
@@ -116,15 +127,60 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
     load()
   }
 
-  const lock = async (): Promise<void> => {
+  const lock = useCallback(async (): Promise<void> => {
     await api.lock()
     onLock()
+  }, [onLock])
+
+  const toggleFavorite = async (id: string): Promise<void> => {
+    await api.toggleFavorite(id)
+    load()
+  }
+
+  const requestImport = async (): Promise<void> => {
+    setSettingsOpen(false)
+    const res = await api.importOpen()
+    if (res.ok && res.value) setImportResult(res.value)
+    else if (!res.ok) setToast(res.error)
   }
 
   // Opens in the user's browser via the main-process window-open handler.
   const openGitHub = (): void => {
     window.open('https://github.com/Mr-Don-Leo/PassForge')
   }
+
+  // Immediate-lock shortcut: Cmd/Ctrl+L.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l') {
+        e.preventDefault()
+        lock()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [lock])
+
+  // Inactivity auto-lock: reset a timer on user activity.
+  useEffect(() => {
+    let minutes = 0
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const reset = (): void => {
+      if (timer) clearTimeout(timer)
+      if (minutes > 0) timer = setTimeout(() => lock(), minutes * 60_000)
+    }
+    const events: Array<keyof WindowEventMap> = ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart']
+    api.getSettings().then((r) => {
+      if (!r.ok) return
+      minutes = r.value.inactivityMinutes
+      reset()
+      events.forEach((ev) => window.addEventListener(ev, reset, { passive: true }))
+    })
+    return () => {
+      if (timer) clearTimeout(timer)
+      events.forEach((ev) => window.removeEventListener(ev, reset))
+    }
+  }, [lock, settingsOpen])
 
   const emptyMessage =
     entries.length === 0
@@ -244,6 +300,20 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
               count={entries.length}
               icon={<Inventory2RoundedIcon fontSize="small" />}
             />
+            <SidebarRow
+              id="favorites"
+              label="Favorites"
+              color="#f5b301"
+              count={favoritesCount}
+              icon={<StarRoundedIcon fontSize="small" />}
+            />
+            <SidebarRow
+              id="health"
+              label="Password Health"
+              color={healthIssues > 0 ? '#ff922b' : '#2fbf87'}
+              count={healthIssues}
+              icon={<ShieldRoundedIcon fontSize="small" />}
+            />
             <Stack
               direction="row"
               alignItems="center"
@@ -298,9 +368,17 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
           </Tooltip>
         </Box>
 
-        {/* Entry list */}
+        {/* Main pane */}
         <Box sx={{ flexGrow: 1, overflowY: 'auto', position: 'relative' }}>
-          {filtered.length === 0 ? (
+          {showHealth ? (
+            <HealthDashboard
+              entries={entries}
+              onOpenEntry={(e) => {
+                setSelected('all')
+                openEdit(e)
+              }}
+            />
+          ) : filtered.length === 0 ? (
             <Stack sx={{ height: '100%', minHeight: 320 }} alignItems="center" justifyContent="center" spacing={1.5}>
               <VpnKeyRoundedIcon sx={{ fontSize: 52, color: 'text.disabled' }} />
               <Typography color="text.secondary">{emptyMessage}</Typography>
@@ -319,6 +397,15 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
                     sx={{ mb: 1 }}
                     secondaryAction={
                       <Stack direction="row" spacing={0.5}>
+                        <Tooltip title={entry.favorite ? 'Unfavorite' : 'Favorite'}>
+                          <IconButton size="small" onClick={() => toggleFavorite(entry.id)}>
+                            {entry.favorite ? (
+                              <StarRoundedIcon fontSize="small" sx={{ color: '#f5b301' }} />
+                            ) : (
+                              <StarBorderRoundedIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title={isSecret ? 'Copy Client ID' : 'Copy username'}>
                           <span>
                             <IconButton
@@ -351,7 +438,7 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
                   >
                     <ListItemButton
                       onClick={() => openEdit(entry)}
-                      sx={{ borderRadius: 2.5, border: '1px solid', borderColor: 'divider', pr: 14, py: 1.25 }}
+                      sx={{ borderRadius: 2.5, border: '1px solid', borderColor: 'divider', pr: 18, py: 1.25 }}
                     >
                       <ListItemIcon sx={{ minWidth: 52 }}>
                         <Avatar
@@ -398,29 +485,37 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
             </List>
           )}
 
-          <Fab color="primary" onClick={(e) => setAddAnchor(e.currentTarget)} sx={{ position: 'absolute', right: 28, bottom: 28 }}>
-            <AddRoundedIcon />
-          </Fab>
-          <Menu
-            anchorEl={addAnchor}
-            open={Boolean(addAnchor)}
-            onClose={() => setAddAnchor(null)}
-            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          >
-            <MenuItem onClick={() => openNew('password')}>
-              <ListItemIcon>
-                <PasswordRoundedIcon fontSize="small" />
-              </ListItemIcon>
-              Password
-            </MenuItem>
-            <MenuItem onClick={() => openNew('secret')}>
-              <ListItemIcon>
-                <KeyRoundedIcon fontSize="small" />
-              </ListItemIcon>
-              Secret / API key
-            </MenuItem>
-          </Menu>
+          {!showHealth && (
+            <>
+              <Fab
+                color="primary"
+                onClick={(e) => setAddAnchor(e.currentTarget)}
+                sx={{ position: 'absolute', right: 28, bottom: 28 }}
+              >
+                <AddRoundedIcon />
+              </Fab>
+              <Menu
+                anchorEl={addAnchor}
+                open={Boolean(addAnchor)}
+                onClose={() => setAddAnchor(null)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              >
+                <MenuItem onClick={() => openNew('password')}>
+                  <ListItemIcon>
+                    <PasswordRoundedIcon fontSize="small" />
+                  </ListItemIcon>
+                  Password
+                </MenuItem>
+                <MenuItem onClick={() => openNew('secret')}>
+                  <ListItemIcon>
+                    <KeyRoundedIcon fontSize="small" />
+                  </ListItemIcon>
+                  Secret / API key
+                </MenuItem>
+              </Menu>
+            </>
+          )}
         </Box>
       </Box>
 
@@ -441,7 +536,20 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
         state={state}
         onClose={() => setSettingsOpen(false)}
         onChange={onStateChange}
+        onRequestImport={requestImport}
       />
+      {importResult && (
+        <ImportDialog
+          result={importResult}
+          categories={categories}
+          onClose={() => setImportResult(null)}
+          onImported={(added, skipped) => {
+            setImportResult(null)
+            setToast(`Imported ${added} item${added === 1 ? '' : 's'}${skipped ? `, skipped ${skipped}` : ''}`)
+            load()
+          }}
+        />
+      )}
       <CategoryManager
         open={managerOpen}
         categories={categories}

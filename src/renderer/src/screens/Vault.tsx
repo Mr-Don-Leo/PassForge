@@ -55,6 +55,11 @@ interface Props {
 }
 
 const SIDEBAR_WIDTH = 232
+const SECONDARY_MAX_CHARS = 28
+
+function truncate(text: string, max = SECONDARY_MAX_CHARS): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text
+}
 
 export default function VaultScreen({ state, onLock, onStateChange }: Props): JSX.Element {
   const [entries, setEntries] = useState<VaultEntry[]>([])
@@ -472,8 +477,14 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
                                 sx={{ height: 20, '& .MuiChip-label': { px: 1 } }}
                               />
                             )}
-                            <Typography variant="body2" color="text.secondary" component="span" noWrap>
-                              {secondary || '—'}
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              component="span"
+                              noWrap
+                              sx={{ minWidth: 0 }}
+                            >
+                              {secondary ? truncate(secondary) : '—'}
                             </Typography>
                           </Stack>
                         }

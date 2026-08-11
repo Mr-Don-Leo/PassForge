@@ -30,6 +30,7 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import VpnKeyRoundedIcon from '@mui/icons-material/VpnKeyRounded'
 import KeyRoundedIcon from '@mui/icons-material/KeyRounded'
 import PasswordRoundedIcon from '@mui/icons-material/PasswordRounded'
+import PinRoundedIcon from '@mui/icons-material/PinRounded'
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded'
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
@@ -393,8 +394,11 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
               {filtered.map((entry) => {
                 const cat = categoryById(categories, entry.category)
                 const isSecret = entry.type === 'secret'
-                const primary = isSecret ? entry.secret : entry.password
+                const isRecovery = entry.type === 'recovery'
+                const codesLeft = entry.codes.filter((c) => !c.used)
+                const primary = isRecovery ? (codesLeft[0]?.value ?? '') : isSecret ? entry.secret : entry.password
                 const secondary = isSecret ? entry.clientId : entry.username
+                const copyPrimaryLabel = isRecovery ? 'Code' : isSecret ? 'Secret' : 'Password'
                 return (
                   <ListItem
                     key={entry.id}
@@ -422,12 +426,14 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
                             </IconButton>
                           </span>
                         </Tooltip>
-                        <Tooltip title={isSecret ? 'Copy secret' : 'Copy password'}>
+                        <Tooltip
+                          title={isRecovery ? 'Copy next unused code' : isSecret ? 'Copy secret' : 'Copy password'}
+                        >
                           <span>
                             <IconButton
                               size="small"
                               disabled={!primary}
-                              onClick={() => copy(primary, isSecret ? 'Secret' : 'Password')}
+                              onClick={() => copy(primary, copyPrimaryLabel)}
                             >
                               <KeyRoundedIcon fontSize="small" />
                             </IconButton>
@@ -477,6 +483,15 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
                                 sx={{ height: 20, '& .MuiChip-label': { px: 1 } }}
                               />
                             )}
+                            {isRecovery && (
+                              <Chip
+                                size="small"
+                                label={`${codesLeft.length}/${entry.codes.length} left`}
+                                variant="outlined"
+                                color={codesLeft.length === 0 ? 'error' : codesLeft.length <= 2 ? 'warning' : 'default'}
+                                sx={{ height: 20, '& .MuiChip-label': { px: 1 } }}
+                              />
+                            )}
                             <Typography
                               variant="body2"
                               color="text.secondary"
@@ -523,6 +538,12 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
                     <KeyRoundedIcon fontSize="small" />
                   </ListItemIcon>
                   Secret / API key
+                </MenuItem>
+                <MenuItem onClick={() => openNew('recovery')}>
+                  <ListItemIcon>
+                    <PinRoundedIcon fontSize="small" />
+                  </ListItemIcon>
+                  2FA recovery codes
                 </MenuItem>
               </Menu>
             </>

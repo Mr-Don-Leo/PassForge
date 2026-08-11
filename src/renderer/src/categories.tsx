@@ -22,10 +22,12 @@ import MusicNoteRoundedIcon from '@mui/icons-material/MusicNoteRounded'
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded'
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded'
 import LockRoundedIcon from '@mui/icons-material/LockRounded'
+import PinRoundedIcon from '@mui/icons-material/PinRounded'
 
 const ICONS: Record<string, ComponentType<SvgIconProps>> = {
   login: LoginRoundedIcon,
   apikey: KeyRoundedIcon,
+  pin: PinRoundedIcon,
   email: EmailRoundedIcon,
   social: GroupRoundedIcon,
   finance: AccountBalanceWalletRoundedIcon,

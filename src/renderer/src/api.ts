@@ -4,6 +4,7 @@ export type {
   AppState,
   VaultEntry,
   PasswordOptions,
+  RecoveryCode,
   Result,
   Category,
   ItemType,
@@ -14,6 +15,7 @@ export type {
 export {
   DEFAULT_CATEGORY,
   SECRET_CATEGORY,
+  RECOVERY_CATEGORY,
   FALLBACK_CATEGORY,
   CATEGORY_ICON_IDS,
   DEFAULT_AUTOLOCK,

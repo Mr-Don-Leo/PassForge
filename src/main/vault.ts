@@ -11,6 +11,7 @@ import {
   type Category,
   type ItemType,
   type PasswordOptions,
+  type RecoveryCode,
   type VaultEntry
 } from '../shared/types'
 
@@ -51,10 +52,18 @@ function normalizeEntry(e: Partial<VaultEntry>): VaultEntry {
     clientId: e.clientId ?? '',
     secret: e.secret ?? '',
     expiresAt: e.expiresAt ?? 0,
+    codes: normalizeCodes(e.codes),
     notes: e.notes ?? '',
     createdAt: e.createdAt ?? Date.now(),
     updatedAt: e.updatedAt ?? Date.now()
   }
+}
+
+function normalizeCodes(codes: unknown): RecoveryCode[] {
+  if (!Array.isArray(codes)) return []
+  return codes
+    .map((c) => ({ value: String((c as RecoveryCode)?.value ?? ''), used: Boolean((c as RecoveryCode)?.used) }))
+    .filter((c) => c.value)
 }
 
 // Escalating lockout after repeated wrong passcodes (ms).
@@ -106,6 +115,13 @@ export class Vault {
     } else {
       this.entries = (raw.entries ?? []).map(normalizeEntry)
       this.categories = raw.categories?.length ? raw.categories : seedCategories()
+    }
+    // Locked default categories added in later versions (e.g. Recovery Codes)
+    // are appended to vaults created before they existed.
+    for (const seed of DEFAULT_CATEGORIES) {
+      if (seed.locked && !this.categories.some((c) => c.id === seed.id)) {
+        this.categories.push({ ...seed })
+      }
     }
   }
 

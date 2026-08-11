@@ -1,6 +1,12 @@
 // Types shared between the main process, preload bridge and renderer.
 
-export type ItemType = 'password' | 'secret'
+export type ItemType = 'password' | 'secret' | 'recovery'
+
+/** One 2FA backup code; `used` marks codes already redeemed. */
+export interface RecoveryCode {
+  value: string
+  used: boolean
+}
 
 export interface VaultEntry {
   id: string
@@ -17,6 +23,8 @@ export interface VaultEntry {
   secret: string
   /** Rotation/expiry date for secrets (epoch ms, 0 = none). */
   expiresAt: number
+  // Recovery / 2FA backup-code items
+  codes: RecoveryCode[]
   // Common
   notes: string
   createdAt: number
@@ -98,6 +106,7 @@ export interface SetupOptions {
 export const CATEGORY_ICON_IDS = [
   'login',
   'apikey',
+  'pin',
   'email',
   'social',
   'finance',
@@ -128,11 +137,14 @@ export const FALLBACK_CATEGORY = 'other'
 export const DEFAULT_CATEGORY = 'login'
 /** Default category for new secret items. */
 export const SECRET_CATEGORY = 'apikeys'
+/** Default category for new recovery-code items. */
+export const RECOVERY_CATEGORY = 'recovery'
 
 /** Seeded when a vault is first created. */
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'login', label: 'Logins', color: '#5b8def', icon: 'login' },
   { id: 'apikeys', label: 'API Keys', color: '#22b8cf', icon: 'apikey', locked: true },
+  { id: 'recovery', label: 'Recovery Codes', color: '#ff922b', icon: 'pin', locked: true },
   { id: 'email', label: 'Email', color: '#e0669a', icon: 'email' },
   { id: 'social', label: 'Social', color: '#8b5cf6', icon: 'social' },
   { id: 'finance', label: 'Finance', color: '#2fbf87', icon: 'finance' },

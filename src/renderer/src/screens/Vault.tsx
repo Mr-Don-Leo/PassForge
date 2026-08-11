@@ -374,142 +374,144 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
           </Tooltip>
         </Box>
 
-        {/* Main pane */}
-        <Box sx={{ flexGrow: 1, overflowY: 'auto', position: 'relative' }}>
-          {showHealth ? (
-            <HealthDashboard
-              entries={entries}
-              onOpenEntry={(e) => {
-                setSelected('all')
-                openEdit(e)
-              }}
-            />
-          ) : filtered.length === 0 ? (
-            <Stack sx={{ height: '100%', minHeight: 320 }} alignItems="center" justifyContent="center" spacing={1.5}>
-              <VpnKeyRoundedIcon sx={{ fontSize: 52, color: 'text.disabled' }} />
-              <Typography color="text.secondary">{emptyMessage}</Typography>
-            </Stack>
-          ) : (
-            <List sx={{ maxWidth: 720, mx: 'auto', p: 2 }}>
-              {filtered.map((entry) => {
-                const cat = categoryById(categories, entry.category)
-                const isSecret = entry.type === 'secret'
-                const isRecovery = entry.type === 'recovery'
-                const codesLeft = entry.codes.filter((c) => !c.used)
-                const primary = isRecovery ? (codesLeft[0]?.value ?? '') : isSecret ? entry.secret : entry.password
-                const secondary = isSecret ? entry.clientId : entry.username
-                const copyPrimaryLabel = isRecovery ? 'Code' : isSecret ? 'Secret' : 'Password'
-                return (
-                  <ListItem
-                    key={entry.id}
-                    disablePadding
-                    sx={{ mb: 1 }}
-                    secondaryAction={
-                      <Stack direction="row" spacing={0.5}>
-                        <Tooltip title={entry.favorite ? 'Unfavorite' : 'Favorite'}>
-                          <IconButton size="small" onClick={() => toggleFavorite(entry.id)}>
-                            {entry.favorite ? (
-                              <StarRoundedIcon fontSize="small" sx={{ color: '#f5b301' }} />
-                            ) : (
-                              <StarBorderRoundedIcon fontSize="small" />
-                            )}
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title={isSecret ? 'Copy Client ID' : 'Copy username'}>
-                          <span>
-                            <IconButton
-                              size="small"
-                              disabled={!secondary}
-                              onClick={() => copy(secondary, isSecret ? 'Client ID' : 'Username')}
-                            >
-                              <ContentCopyRoundedIcon fontSize="small" />
+        {/* Main pane. Content scrolls in an inner box so the add button stays anchored. */}
+        <Box sx={{ flexGrow: 1, position: 'relative', minWidth: 0 }}>
+          <Box sx={{ height: '100%', overflowY: 'auto' }}>
+            {showHealth ? (
+              <HealthDashboard
+                entries={entries}
+                onOpenEntry={(e) => {
+                  setSelected('all')
+                  openEdit(e)
+                }}
+              />
+            ) : filtered.length === 0 ? (
+              <Stack sx={{ height: '100%', minHeight: 320 }} alignItems="center" justifyContent="center" spacing={1.5}>
+                <VpnKeyRoundedIcon sx={{ fontSize: 52, color: 'text.disabled' }} />
+                <Typography color="text.secondary">{emptyMessage}</Typography>
+              </Stack>
+            ) : (
+              <List sx={{ maxWidth: 720, mx: 'auto', p: 2 }}>
+                {filtered.map((entry) => {
+                  const cat = categoryById(categories, entry.category)
+                  const isSecret = entry.type === 'secret'
+                  const isRecovery = entry.type === 'recovery'
+                  const codesLeft = entry.codes.filter((c) => !c.used)
+                  const primary = isRecovery ? (codesLeft[0]?.value ?? '') : isSecret ? entry.secret : entry.password
+                  const secondary = isSecret ? entry.clientId : entry.username
+                  const copyPrimaryLabel = isRecovery ? 'Code' : isSecret ? 'Secret' : 'Password'
+                  return (
+                    <ListItem
+                      key={entry.id}
+                      disablePadding
+                      sx={{ mb: 1 }}
+                      secondaryAction={
+                        <Stack direction="row" spacing={0.5}>
+                          <Tooltip title={entry.favorite ? 'Unfavorite' : 'Favorite'}>
+                            <IconButton size="small" onClick={() => toggleFavorite(entry.id)}>
+                              {entry.favorite ? (
+                                <StarRoundedIcon fontSize="small" sx={{ color: '#f5b301' }} />
+                              ) : (
+                                <StarBorderRoundedIcon fontSize="small" />
+                              )}
                             </IconButton>
-                          </span>
-                        </Tooltip>
-                        <Tooltip
-                          title={isRecovery ? 'Copy next unused code' : isSecret ? 'Copy secret' : 'Copy password'}
-                        >
-                          <span>
-                            <IconButton
-                              size="small"
-                              disabled={!primary}
-                              onClick={() => copy(primary, copyPrimaryLabel)}
-                            >
-                              <KeyRoundedIcon fontSize="small" />
+                          </Tooltip>
+                          <Tooltip title={isSecret ? 'Copy Client ID' : 'Copy username'}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                disabled={!secondary}
+                                onClick={() => copy(secondary, isSecret ? 'Client ID' : 'Username')}
+                              >
+                                <ContentCopyRoundedIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip
+                            title={isRecovery ? 'Copy next unused code' : isSecret ? 'Copy secret' : 'Copy password'}
+                          >
+                            <span>
+                              <IconButton
+                                size="small"
+                                disabled={!primary}
+                                onClick={() => copy(primary, copyPrimaryLabel)}
+                              >
+                                <KeyRoundedIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton size="small" onClick={() => remove(entry.id)}>
+                              <DeleteOutlineRoundedIcon fontSize="small" />
                             </IconButton>
-                          </span>
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton size="small" onClick={() => remove(entry.id)}>
-                            <DeleteOutlineRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    }
-                  >
-                    <ListItemButton
-                      onClick={() => openEdit(entry)}
-                      sx={{ borderRadius: 2.5, border: '1px solid', borderColor: 'divider', pr: 18, py: 1.25 }}
+                          </Tooltip>
+                        </Stack>
+                      }
                     >
-                      <ListItemIcon sx={{ minWidth: 52 }}>
-                        <Avatar
-                          variant="rounded"
-                          sx={{ bgcolor: alpha(cat.color, 0.16), color: cat.color, width: 40, height: 40 }}
-                        >
-                          <CategoryIcon icon={cat.icon} fontSize="small" />
-                        </Avatar>
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={entry.title}
-                        primaryTypographyProps={{ fontWeight: 600 }}
-                        secondary={
-                          <Stack direction="row" spacing={0.75} alignItems="center" component="span" sx={{ mt: 0.25 }}>
-                            <Chip
-                              size="small"
-                              label={cat.label}
-                              sx={{
-                                height: 20,
-                                bgcolor: alpha(cat.color, 0.16),
-                                color: cat.color,
-                                fontWeight: 600,
-                                '& .MuiChip-label': { px: 1 }
-                              }}
-                            />
-                            {isSecret && (
+                      <ListItemButton
+                        onClick={() => openEdit(entry)}
+                        sx={{ borderRadius: 2.5, border: '1px solid', borderColor: 'divider', pr: 18, py: 1.25 }}
+                      >
+                        <ListItemIcon sx={{ minWidth: 52 }}>
+                          <Avatar
+                            variant="rounded"
+                            sx={{ bgcolor: alpha(cat.color, 0.16), color: cat.color, width: 40, height: 40 }}
+                          >
+                            <CategoryIcon icon={cat.icon} fontSize="small" />
+                          </Avatar>
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={entry.title}
+                          primaryTypographyProps={{ fontWeight: 600 }}
+                          secondary={
+                            <Stack direction="row" spacing={0.75} alignItems="center" component="span" sx={{ mt: 0.25 }}>
                               <Chip
                                 size="small"
-                                label="Secret"
-                                variant="outlined"
-                                sx={{ height: 20, '& .MuiChip-label': { px: 1 } }}
+                                label={cat.label}
+                                sx={{
+                                  height: 20,
+                                  bgcolor: alpha(cat.color, 0.16),
+                                  color: cat.color,
+                                  fontWeight: 600,
+                                  '& .MuiChip-label': { px: 1 }
+                                }}
                               />
-                            )}
-                            {isRecovery && (
-                              <Chip
-                                size="small"
-                                label={`${codesLeft.length}/${entry.codes.length} left`}
-                                variant="outlined"
-                                color={codesLeft.length === 0 ? 'error' : codesLeft.length <= 2 ? 'warning' : 'default'}
-                                sx={{ height: 20, '& .MuiChip-label': { px: 1 } }}
-                              />
-                            )}
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                              component="span"
-                              noWrap
-                              sx={{ minWidth: 0 }}
-                            >
-                              {secondary ? truncate(secondary) : '—'}
-                            </Typography>
-                          </Stack>
-                        }
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                )
-              })}
-            </List>
-          )}
+                              {isSecret && (
+                                <Chip
+                                  size="small"
+                                  label="Secret"
+                                  variant="outlined"
+                                  sx={{ height: 20, '& .MuiChip-label': { px: 1 } }}
+                                />
+                              )}
+                              {isRecovery && (
+                                <Chip
+                                  size="small"
+                                  label={`${codesLeft.length}/${entry.codes.length} left`}
+                                  variant="outlined"
+                                  color={codesLeft.length === 0 ? 'error' : codesLeft.length <= 2 ? 'warning' : 'default'}
+                                  sx={{ height: 20, '& .MuiChip-label': { px: 1 } }}
+                                />
+                              )}
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                component="span"
+                                noWrap
+                                sx={{ minWidth: 0 }}
+                              >
+                                {secondary ? truncate(secondary) : '—'}
+                              </Typography>
+                            </Stack>
+                          }
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  )
+                })}
+              </List>
+            )}
+          </Box>
 
           {!showHealth && (
             <>

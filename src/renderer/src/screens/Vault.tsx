@@ -418,7 +418,7 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
                       secondaryAction={
                         <Stack direction="row" spacing={0.5}>
                           {!isSecret && !isRecovery && (
-                            <Tooltip title="Autofill — hides PassForge and types into the previous app (⌘/Ctrl+Shift+U works from anywhere)">
+                            <Tooltip title="Autofill — returns to the previous app and types username, Tab, password (⌘/Ctrl+Shift+U works from anywhere)">
                               <span>
                                 <IconButton
                                   size="small"

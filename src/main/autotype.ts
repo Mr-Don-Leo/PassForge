@@ -50,15 +50,23 @@ function assertMacAccessibility(): void {
   }
 }
 
-const MAC_TITLE_SCRIPT = `
+const MAC_ACTIVE_SCRIPT = `
 tell application "System Events"
   set p to first application process whose frontmost is true
-  set t to name of p
+  set n to name of p
+  set t to n
   try
     set t to t & " — " & (name of front window of p)
   end try
-  return t
+  return n & linefeed & t
 end tell`
+
+const MAC_FOCUS_SCRIPT = `
+on run argv
+  tell application "System Events"
+    set frontmost of process (item 1 of argv) to true
+  end tell
+end run`
 
 const MAC_TYPE_SCRIPT = `
 on run argv
@@ -75,7 +83,7 @@ end run`
 
 // ---- Windows ----------------------------------------------------------------
 
-const WIN_TITLE_SCRIPT = `
+const WIN_ACTIVE_SCRIPT = `
 Add-Type @"
 using System; using System.Runtime.InteropServices; using System.Text;
 public class PFWin {
@@ -86,7 +94,22 @@ public class PFWin {
 $h = [PFWin]::GetForegroundWindow()
 $sb = New-Object System.Text.StringBuilder 512
 [void][PFWin]::GetWindowText($h, $sb, 512)
+"$([int64]$h)"
 $sb.ToString()`
+
+// The HWND arrives via env; restore if minimized, then bring to the foreground.
+const WIN_FOCUS_SCRIPT = `
+Add-Type @"
+using System; using System.Runtime.InteropServices;
+public class PFFocus {
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+}
+"@
+$h = [IntPtr][int64]$env:PF_HWND
+if ([PFFocus]::IsIconic($h)) { [void][PFFocus]::ShowWindow($h, 9) }
+if (-not [PFFocus]::SetForegroundWindow($h)) { throw 'Could not focus the target window.' }`
 
 // Credentials arrive via env vars; SendKeys metacharacters are escaped there.
 const WIN_TYPE_SCRIPT = `
@@ -124,17 +147,53 @@ async function typeLinux(username: string, password: string, submit: boolean): P
 
 // ---- public API --------------------------------------------------------------
 
-/** Title (and app name) of the window the OS currently has focused. */
-export async function getActiveWindowTitle(): Promise<string> {
+/** A window we can match against and later refocus to type into. */
+export interface ActiveWindow {
+  /** Process name (macOS), HWND (Windows) or X11 window id (Linux). */
+  id: string
+  title: string
+}
+
+/** The window the OS currently has focused. */
+export async function getActiveWindow(): Promise<ActiveWindow> {
+  switch (process.platform) {
+    case 'darwin': {
+      assertMacAccessibility()
+      const out = await run('osascript', ['-e', MAC_ACTIVE_SCRIPT])
+      const [id, ...rest] = out.split('\n')
+      return { id: id.trim(), title: rest.join(' ').trim() }
+    }
+    case 'win32': {
+      const out = await run('powershell.exe', [...POWERSHELL_ARGS, WIN_ACTIVE_SCRIPT])
+      const [id, ...rest] = out.split(/\r?\n/)
+      return { id: id.trim(), title: rest.join(' ').trim() }
+    }
+    default:
+      try {
+        const id = (await run('xdotool', ['getactivewindow'])).trim()
+        const title = (await run('xdotool', ['getwindowname', id])).trim()
+        return { id, title }
+      } catch (err) {
+        throw withXdotoolHint(err)
+      }
+  }
+}
+
+/** Bring a previously captured window back to the foreground. */
+export async function focusWindow(target: ActiveWindow): Promise<void> {
   switch (process.platform) {
     case 'darwin':
       assertMacAccessibility()
-      return (await run('osascript', ['-e', MAC_TITLE_SCRIPT])).trim()
+      await run('osascript', ['-e', MAC_FOCUS_SCRIPT, target.id])
+      return
     case 'win32':
-      return (await run('powershell.exe', [...POWERSHELL_ARGS, WIN_TITLE_SCRIPT])).trim()
+      await run('powershell.exe', [...POWERSHELL_ARGS, WIN_FOCUS_SCRIPT], {
+        env: { ...process.env, PF_HWND: target.id }
+      })
+      return
     default:
       try {
-        return (await run('xdotool', ['getactivewindow', 'getwindowname'])).trim()
+        await run('xdotool', ['windowactivate', '--sync', target.id])
       } catch (err) {
         throw withXdotoolHint(err)
       }

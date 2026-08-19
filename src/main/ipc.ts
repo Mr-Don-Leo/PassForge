@@ -5,7 +5,7 @@ import { Vault, generatePassword } from './vault'
 import { biometricAvailable } from './biometric'
 import { getSettings, setSettings } from './settings'
 import { parseImportFile } from './importers'
-import { getActiveWindowTitle, matchEntriesToWindow, typeCredentials } from './autotype'
+import { focusWindow, getActiveWindow, matchEntriesToWindow, typeCredentials, type ActiveWindow } from './autotype'
 import type {
   AppState,
   AppSettings,
@@ -185,18 +185,28 @@ export function registerIpc(): void {
 
   // ---- autofill (auto-type) ---------------------------------------------------
 
-  // Per-entry autofill: hide our window so focus returns to the previous app,
-  // give the OS a moment to settle, then type into whatever is now focused.
+  // Per-entry autofill. When the hotkey flow captured a target window, focus is
+  // handed straight back to it; otherwise we hide our window and type into
+  // whatever the OS refocuses.
   ipcMain.handle('autotype:perform', async (_e, id: string): Promise<Result> => {
     if (!vault.isUnlocked()) return { ok: false, error: 'Vault is locked.' }
     const entry = vault.list().find((x) => x.id === id)
     if (!entry) return { ok: false, error: 'Entry not found.' }
     if (!entry.username && !entry.password) return { ok: false, error: 'This entry has nothing to type.' }
     const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
-    win?.hide()
-    if (process.platform === 'darwin') app.hide() // hand focus back to the previous app
-    await delay(650)
+    const target = takePendingTarget()
     try {
+      if (target) {
+        // Focus the captured window first: we are still the foreground app
+        // here, which is what grants the right to reassign focus on Windows.
+        await focusWindow(target)
+        win?.hide()
+        await delay(300)
+      } else {
+        win?.hide()
+        if (process.platform === 'darwin') app.hide() // hand focus back to the previous app
+        await delay(650)
+      }
       await typeCredentials(entry, getSettings().autotypeSubmit)
       return { ok: true }
     } catch (err) {
@@ -205,6 +215,24 @@ export function registerIpc(): void {
       return { ok: false, error: (err as Error).message }
     }
   })
+}
+
+// Target window captured when the hotkey flow falls back to the PassForge
+// window (ambiguous match, no match, or locked vault). The next per-entry
+// autofill returns focus there before typing, instead of relying on the OS
+// to restore focus after we hide.
+let pendingTarget: { ref: ActiveWindow; at: number } | null = null
+const PENDING_TARGET_TTL = 90_000
+
+function rememberTarget(ref: ActiveWindow): void {
+  pendingTarget = { ref, at: Date.now() }
+}
+
+function takePendingTarget(): ActiveWindow | null {
+  const t = pendingTarget
+  pendingTarget = null
+  if (!t || Date.now() - t.at > PENDING_TARGET_TTL) return null
+  return t.ref
 }
 
 // ---- global auto-type hotkey ---------------------------------------------------
@@ -244,19 +272,21 @@ async function triggerAutotype(): Promise<void> {
     sendStatus('info', 'Focus the app you want to fill first, then press the shortcut.')
     return
   }
+  let active: ActiveWindow
+  try {
+    active = await getActiveWindow()
+  } catch (err) {
+    showMainWindow()
+    if (vault.isUnlocked()) sendStatus('error', (err as Error).message)
+    return
+  }
   if (!vault.isUnlocked()) {
+    // Remember where to return once the user unlocks and picks an entry.
+    rememberTarget(active)
     showMainWindow() // the lock screen explains itself
     return
   }
-  let title: string
-  try {
-    title = await getActiveWindowTitle()
-  } catch (err) {
-    showMainWindow()
-    sendStatus('error', (err as Error).message)
-    return
-  }
-  const matches = matchEntriesToWindow(vault.list(), title)
+  const matches = matchEntriesToWindow(vault.list(), active.title)
   if (matches.length === 1) {
     try {
       await typeCredentials(matches[0], getSettings().autotypeSubmit)
@@ -266,13 +296,14 @@ async function triggerAutotype(): Promise<void> {
     }
     return
   }
+  rememberTarget(active)
   showMainWindow()
-  const short = title.length > 48 ? `${title.slice(0, 48)}…` : title
+  const short = active.title.length > 48 ? `${active.title.slice(0, 48)}…` : active.title
   sendStatus(
     'info',
     matches.length === 0
-      ? `No entry matches “${short}” — use the autofill button on an entry.`
-      : `${matches.length} entries match “${short}” — use the autofill button on one.`
+      ? `No entry matches “${short}” — click the ✦ button on an entry to fill it there.`
+      : `${matches.length} entries match “${short}” — click ✦ on the right one to fill it there.`
   )
 }
 

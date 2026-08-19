@@ -1,4 +1,4 @@
-import { app, ipcMain, dialog, globalShortcut, BrowserWindow } from 'electron'
+import { app, ipcMain, dialog, globalShortcut, BrowserWindow, Notification } from 'electron'
 import fs from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Vault, generatePassword } from './vault'
@@ -6,6 +6,7 @@ import { biometricAvailable } from './biometric'
 import { getSettings, setSettings } from './settings'
 import { parseImportFile } from './importers'
 import { focusWindow, getActiveWindow, matchEntriesToWindow, typeCredentials, type ActiveWindow } from './autotype'
+import { startWindowWatcher, stopWindowWatcher } from './watcher'
 import type {
   AppState,
   AppSettings,
@@ -180,6 +181,7 @@ export function registerIpc(): void {
   ipcMain.handle('settings:set', (_e, patch: Partial<AppSettings>): Result<AppSettings> => {
     const value = setSettings(patch)
     syncAutotypeShortcut()
+    syncAutofillWatcher()
     return { ok: true, value }
   })
 
@@ -233,6 +235,75 @@ function takePendingTarget(): ActiveWindow | null {
   pendingTarget = null
   if (!t || Date.now() - t.at > PENDING_TARGET_TTL) return null
   return t.ref
+}
+
+// ---- hotkey-free autofill offers ------------------------------------------------
+
+/** Don't re-offer the same entry for a while after showing (or ignoring) an offer. */
+const OFFER_COOLDOWN = 10 * 60_000
+const offerShownAt = new Map<string, number>()
+
+function shortTitle(title: string): string {
+  return title.length > 48 ? `${title.slice(0, 48)}…` : title
+}
+
+/** Start/stop the focused-window watcher to match the current settings. */
+export function syncAutofillWatcher(): void {
+  const s = getSettings()
+  if (s.autotypeEnabled && s.autotypeOffer) startWindowWatcher(onWindowChange)
+  else stopWindowWatcher()
+}
+
+export function stopAutofillWatcher(): void {
+  stopWindowWatcher()
+}
+
+function onWindowChange(win: ActiveWindow): void {
+  if (!vault.isUnlocked()) return
+  if (!Notification.isSupported()) return
+  // Ignore our own windows gaining focus.
+  if (BrowserWindow.getAllWindows().some((w) => w.isFocused())) return
+  const matches = matchEntriesToWindow(vault.list(), win.title)
+  if (matches.length === 0) return
+  const key = matches[0].id
+  const last = offerShownAt.get(key) ?? 0
+  if (Date.now() - last < OFFER_COOLDOWN) return
+  offerShownAt.set(key, Date.now())
+
+  const single = matches.length === 1 ? matches[0] : null
+  const notification = new Notification({
+    title: single ? `Autofill ${single.title}?` : 'Autofill available',
+    body: single
+      ? `Click to type ${single.username || 'the credentials'} into “${shortTitle(win.title)}”.`
+      : `${matches.length} entries match “${shortTitle(win.title)}” — click to choose.`,
+    silent: true
+  })
+  notification.on('click', () => void fillFromOffer(single?.id ?? null, win))
+  notification.show()
+}
+
+/** Clicking an offer: refocus the captured window and type, or open the picker. */
+async function fillFromOffer(entryId: string | null, target: ActiveWindow): Promise<void> {
+  if (!vault.isUnlocked()) {
+    rememberTarget(target)
+    showMainWindow()
+    return
+  }
+  const entry = entryId ? vault.list().find((x) => x.id === entryId) : null
+  if (!entry) {
+    rememberTarget(target)
+    showMainWindow()
+    sendStatus('info', `Click ✦ on an entry to fill “${shortTitle(target.title)}”.`)
+    return
+  }
+  try {
+    await focusWindow(target)
+    await delay(300)
+    await typeCredentials(entry, getSettings().autotypeSubmit)
+  } catch (err) {
+    showMainWindow()
+    sendStatus('error', (err as Error).message)
+  }
 }
 
 // ---- global auto-type hotkey ---------------------------------------------------

@@ -156,6 +156,16 @@ export default function SettingsDialog({ open, state, onClose, onChange, onReque
               <FormControlLabel
                 control={
                   <Switch
+                    checked={prefs.autotypeOffer}
+                    disabled={!prefs.autotypeEnabled}
+                    onChange={(e) => updatePrefs({ autotypeOffer: e.target.checked })}
+                  />
+                }
+                label={<Typography variant="body2">Offer autofill when a matching window is focused</Typography>}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
                     checked={prefs.autotypeSubmit}
                     disabled={!prefs.autotypeEnabled}
                     onChange={(e) => updatePrefs({ autotypeSubmit: e.target.checked })}
@@ -164,10 +174,12 @@ export default function SettingsDialog({ open, state, onClose, onChange, onReque
                 label={<Typography variant="body2">Press Enter after filling</Typography>}
               />
               <Typography variant="caption" color="text.secondary">
-                Focus a login form in any app or browser, then press ⌘/Ctrl+Shift+U. PassForge matches
+                Focus a login form in any app or browser, then press ⌘/Ctrl+Shift+U — PassForge matches
                 the window against your entries (by website and title) and types username, Tab, password.
-                You can also click the ✦ autofill button on an entry. macOS asks for Accessibility
-                access on first use; Linux needs xdotool (X11).
+                With offers on, switching to a matching window shows a notification you can click to fill,
+                no hotkey needed (once per entry per 10 minutes, only while unlocked). You can also click
+                the ✦ autofill button on an entry. macOS asks for Accessibility access on first use;
+                Linux needs xdotool (X11).
               </Typography>
             </Stack>
           </Box>

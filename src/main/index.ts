@@ -1,6 +1,6 @@
 import { app, BrowserWindow, shell, powerMonitor, globalShortcut } from 'electron'
 import { join } from 'node:path'
-import { registerIpc, lockVault, lockAndNotify, syncAutotypeShortcut } from './ipc'
+import { registerIpc, lockVault, lockAndNotify, syncAutotypeShortcut, syncAutofillWatcher, stopAutofillWatcher } from './ipc'
 import { getSettings } from './settings'
 
 const isDev = !app.isPackaged
@@ -53,10 +53,14 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Windows ties toast notifications (autofill offers) to this id.
+  if (process.platform === 'win32') app.setAppUserModelId('com.mrdonleo.passforge')
   registerIpc()
   createWindow()
-  // Global autofill hotkey (Cmd/Ctrl+Shift+U), honoring the user's setting.
+  // Global autofill hotkey (Cmd/Ctrl+Shift+U) + notification offers,
+  // honoring the user's settings.
   syncAutotypeShortcut()
+  syncAutofillWatcher()
 
   // OS-level auto-lock triggers. Sleep and screen-lock (also fired on fast
   // user-switching) lock the vault and notify the renderer.
@@ -78,7 +82,10 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => lockVault())
 
-app.on('will-quit', () => globalShortcut.unregisterAll())
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
+  stopAutofillWatcher()
+})
 
 // Deny attempts to open new windows / webviews for defence in depth.
 app.on('web-contents-created', (_e, contents) => {

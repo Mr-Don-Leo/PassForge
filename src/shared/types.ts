@@ -42,6 +42,8 @@ export interface AppSettings {
   autotypeEnabled: boolean
   /** Press Enter after typing the credentials. */
   autotypeSubmit: boolean
+  /** Offer autofill via an OS notification when a matching window is focused. */
+  autotypeOffer: boolean
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -50,7 +52,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   onScreenLock: true,
   onMinimize: false,
   autotypeEnabled: true,
-  autotypeSubmit: false
+  autotypeSubmit: false,
+  autotypeOffer: true
 }
 
 /** Feedback from the main process about an auto-type attempt (shown as a toast). */

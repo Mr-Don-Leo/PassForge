@@ -12,8 +12,12 @@ compiled into the renderer bundle).
 
 ## 2. Code structure
 - `src/main/` — Electron main process (Node, has the DEK/plaintext):
-  - `index.ts` window + hardening + OS auto-lock wiring (powerMonitor, minimize).
-  - `ipc.ts` all IPC handlers; owns the single `Vault` instance; `lockAndNotify()`.
+  - `index.ts` window + hardening + OS auto-lock wiring (powerMonitor, minimize);
+    registers the global autofill hotkey via `syncAutotypeShortcut()`.
+  - `ipc.ts` all IPC handlers; owns the single `Vault` instance; `lockAndNotify()`;
+    the auto-type hotkey flow (`triggerAutotype`) + per-entry `autotype:perform`.
+  - `autotype.ts` autofill: active-window title + keystroke injection via OS
+    built-ins (osascript / PowerShell SendKeys / xdotool), pure `matchEntriesToWindow()`.
   - `vault.ts` `Vault` class: encrypted file I/O, unlock/lockout, entries+categories
     CRUD, import, favorites; plus the password generator.
   - `crypto.ts` `seal`/`open` (AES-256-GCM, fresh random IV per call) + `deriveKey` (scrypt).
@@ -37,8 +41,19 @@ new fields, and `loadPayload()` appends locked default categories missing from o
 vaults, so old vaults migrate automatically on unlock.
 
 ## 3. Recent changes
-Latest: **v0.5.1** (`c5f41d1`). Tree is clean — no uncommitted work (besides this PREP.md).
+Latest: **v0.6.0**. Tree is clean — no uncommitted work (besides this PREP.md).
 Recent line (newest first):
+- `fea0c22` **feat: autofill / auto-type** (v0.6.0) — global hotkey **⌘/Ctrl+Shift+U**
+  matches the focused window's title against password entries (URL host 3 > site
+  name 2 > entry title 1; only the top tier returned, unique ⇒ type immediately,
+  else the vault window pops up with a toast). Per-entry ✦ button hides the window
+  (`app.hide()` on mac), waits 650 ms, then types username‑Tab‑password (+Enter if
+  `autotypeSubmit`). Zero-dep keystrokes: osascript System Events (needs
+  Accessibility; `systemPreferences.isTrustedAccessibilityClient(true)` prompts),
+  PowerShell SendKeys (creds via env, metachars escaped), `xdotool` on X11 (creds
+  via stdin; friendly error when missing). `AutoLockSettings` renamed to
+  `AppSettings` (+`autotypeEnabled`/`autotypeSubmit`, defaults true/false; old
+  settings.json merges fine). New IPC: `autotype:perform`, `autotype:status` event.
 - `f12d402` **fix: add (+) button anchored while list scrolls** (v0.5.1) — the FAB was
   absolutely positioned *inside* the scroll container and scrolled away with long lists;
   the Vault main pane now scrolls in an inner box with the FAB against the outer pane.
@@ -69,7 +84,11 @@ warning is harmless noise).
   with an esbuild harness (create → save → lock/unlock round-trip, category migration,
   delete protection), and the FAB fix by code inspection + build — but neither was
   clicked through on real hardware. OS-event auto-locks and the native import file picker
-  remain unverified on hardware too.
+  remain unverified on hardware too. **Autofill (v0.6.0): `matchEntriesToWindow` has a
+  15-case esbuild harness (all green) and the xdotool-missing error path was exercised,
+  but actual keystroke injection was NOT tested on any OS** — no display here. First
+  hardware pass should check: mac Accessibility prompt, SendKeys escaping of `+^%~(){}`
+  passwords, focus-return timing after hide (650 ms), and the hotkey-while-locked flow.
 - **Recovery-code ideas discussed but not built:** search doesn't match code values
   (intentional — codes are secrets); health.ts could flag entries with 0 codes left;
   copy-next-unused could optionally auto-mark the code used.

@@ -41,8 +41,27 @@ new fields, and `loadPayload()` appends locked default categories missing from o
 vaults, so old vaults migrate automatically on unlock.
 
 ## 3. Recent changes
-Latest: **v0.7.0**. Tree is clean — no uncommitted work (besides this PREP.md).
+Latest: **v0.8.0**. Tree is clean — no uncommitted work (besides this PREP.md).
 Recent line (newest first):
+- `ee84354` **feat: Chrome-style in-page autofill** (v0.8.0) — `extension/` (MV3,
+  Chrome/Edge/Brave; stable ID `nhijkfecbioegiplfklgppedakljfgea` pinned via manifest
+  `key`; the RSA private key was throwaway — only needed again for a Web Store upload,
+  which would assign its own ID anyway). content.js: focusin-delegated dropdown (closed
+  shadow DOM), fills via native value setter + input/change events; username field =
+  nearest prior visible text/email/tel input. `src/main/browser.ts`: bridge socket
+  (JSON-lines; `userData/bridge.sock` 0600, or per-user named pipe on Windows) served by
+  the running app; the native host is THIS binary relaunched by the browser — detected
+  in index.ts via a `chrome-extension://` argv (host mode: no window/IPC, relays 4-byte-LE
+  framed stdio ↔ socket, exits on stdin end). Creds released ONLY when unlocked and ONLY
+  by URL-host match (`matchEntriesToPageUrl`; page host vs entry host, suffix-safe).
+  Settings → Browser integration writes host manifests (dirs on mac/linux if browser
+  present, HKCU `reg add` on Windows) pointing at `process.execPath` (⇒ packaged builds
+  only; dev exePath is bare electron). Extension ships via extraResources + a
+  `passforge-extension.zip` release asset (release.yml now checks out + zips).
+  **Verified end-to-end via node harness** (framed stdio → relay → socket → match →
+  reply; locked/unknown-site/open/exit paths green). Not tested in a real browser.
+  Known gap: any same-user process can query the socket while unlocked (KeePassXC-style
+  pairing would fix; documented in browser.ts header).
 - `0a00149` **feat: hotkey-free autofill offers** (v0.7.0) — new `src/main/watcher.ts`
   streams focused-window changes (persistent osascript `repeat`/`log` loop on mac —
   reads **stderr**; persistent PowerShell loop on Windows — stdout, `\t`-separated

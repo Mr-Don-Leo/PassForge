@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "PassForge",
+  "version": "0.8.0",
+  "description": "Fill usernames and passwords on login forms from your local PassForge vault.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAiqfBWtq0xcPPzEUjYohDIlFzQcc7yvBLthzyAz/l3fpMIkRH/H2HYZgZJRohddsr/tq3wjlX2iMmPF8J/FCYb1LL68Cnc4vunmd0VA05o0vLQnM+U1LNUV8yTLvTHjZlpLoaVJviTLnD1KCFg4BUn651PBZXnsAxH70mBLabfIgdypCBPWkXJT+5dvf2fB2ywGrcMe5lNy7z+boL8PKOj/1V2YEOoTnSGUiKQx5x0YbLUn2vVBjSQmITyFeLI1RDLT8z2YFKRisy7zQXRd4N471McKTOzuiLW9wLodLjtYzb+KedMqioly1XKBikNDpcDOZ0iLm3QRALHJ/9NKN5ZwIDAQAB",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "permissions": ["nativeMessaging"]
+}

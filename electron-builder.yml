@@ -10,6 +10,11 @@ files:
   - out/**/*
   - package.json
 
+# Unpacked browser extension, shipped beside the app for "Load unpacked".
+extraResources:
+  - from: extension
+    to: extension
+
 # ---- macOS ----
 mac:
   category: public.app-category.utilities

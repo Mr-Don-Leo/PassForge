@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell, powerMonitor, globalShortcut } from 'electron'
 import { join } from 'node:path'
-import { registerIpc, lockVault, lockAndNotify, syncAutotypeShortcut, syncAutofillWatcher, stopAutofillWatcher } from './ipc'
+import { registerIpc, lockVault, lockAndNotify, startBridge, syncAutotypeShortcut, syncAutofillWatcher, stopAutofillWatcher } from './ipc'
+import { isNativeHostInvocation, runNativeHost, stopBridgeServer } from './browser'
 import { getSettings } from './settings'
 
 const isDev = !app.isPackaged
@@ -52,42 +53,54 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
-  // Windows ties toast notifications (autofill offers) to this id.
-  if (process.platform === 'win32') app.setAppUserModelId('com.mrdonleo.passforge')
-  registerIpc()
-  createWindow()
-  // Global autofill hotkey (Cmd/Ctrl+Shift+U) + notification offers,
-  // honoring the user's settings.
-  syncAutotypeShortcut()
-  syncAutofillWatcher()
-
-  // OS-level auto-lock triggers. Sleep and screen-lock (also fired on fast
-  // user-switching) lock the vault and notify the renderer.
-  powerMonitor.on('suspend', () => {
-    if (getSettings().onSleep) lockAndNotify()
+if (isNativeHostInvocation(process.argv)) {
+  // The browser spawned this instance as its native-messaging host: no window,
+  // no IPC, no vault — just relay stdio frames to the running app's bridge
+  // socket, and exit when the browser closes the pipe.
+  app.whenReady().then(() => {
+    app.dock?.hide()
+    runNativeHost()
   })
-  powerMonitor.on('lock-screen', () => {
-    if (getSettings().onScreenLock) lockAndNotify()
+} else {
+  app.whenReady().then(() => {
+    // Windows ties toast notifications (autofill offers) to this id.
+    if (process.platform === 'win32') app.setAppUserModelId('com.mrdonleo.passforge')
+    registerIpc()
+    createWindow()
+    // Global autofill hotkey (Cmd/Ctrl+Shift+U), notification offers and the
+    // browser-extension bridge, honoring the user's settings.
+    syncAutotypeShortcut()
+    syncAutofillWatcher()
+    startBridge()
+
+    // OS-level auto-lock triggers. Sleep and screen-lock (also fired on fast
+    // user-switching) lock the vault and notify the renderer.
+    powerMonitor.on('suspend', () => {
+      if (getSettings().onSleep) lockAndNotify()
+    })
+    powerMonitor.on('lock-screen', () => {
+      if (getSettings().onScreenLock) lockAndNotify()
+    })
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
   })
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit()
   })
-})
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+  app.on('before-quit', () => lockVault())
 
-app.on('before-quit', () => lockVault())
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll()
+    stopAutofillWatcher()
+    stopBridgeServer()
+  })
 
-app.on('will-quit', () => {
-  globalShortcut.unregisterAll()
-  stopAutofillWatcher()
-})
-
-// Deny attempts to open new windows / webviews for defence in depth.
-app.on('web-contents-created', (_e, contents) => {
-  contents.on('will-attach-webview', (event) => event.preventDefault())
-})
+  // Deny attempts to open new windows / webviews for defence in depth.
+  app.on('web-contents-created', (_e, contents) => {
+    contents.on('will-attach-webview', (event) => event.preventDefault())
+  })
+}

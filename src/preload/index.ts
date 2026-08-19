@@ -52,6 +52,11 @@ const api = {
     ipcRenderer.invoke('settings:set', patch),
   /** Hide the window and type this entry's credentials into the previous app. */
   autotype: (id: string): Promise<Result> => ipcRenderer.invoke('autotype:perform', id),
+  /** Register the native-messaging manifests for installed Chromium browsers. */
+  installBrowserIntegration: (): Promise<Result<{ configured: string[]; extensionDir: string }>> =>
+    ipcRenderer.invoke('browser:install'),
+  /** Open the bundled unpacked-extension folder in the file manager. */
+  revealExtension: (): Promise<Result> => ipcRenderer.invoke('browser:revealExtension'),
   /** Subscribe to main-process auto-locks. Returns an unsubscribe function. */
   onLocked: (cb: () => void): (() => void) => {
     const listener = (): void => cb()

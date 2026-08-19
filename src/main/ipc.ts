@@ -1,4 +1,4 @@
-import { app, ipcMain, dialog, globalShortcut, BrowserWindow, Notification } from 'electron'
+import { app, ipcMain, dialog, globalShortcut, shell, BrowserWindow, Notification } from 'electron'
 import fs from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Vault, generatePassword } from './vault'
@@ -7,6 +7,7 @@ import { getSettings, setSettings } from './settings'
 import { parseImportFile } from './importers'
 import { focusWindow, getActiveWindow, matchEntriesToWindow, typeCredentials, type ActiveWindow } from './autotype'
 import { startWindowWatcher, stopWindowWatcher } from './watcher'
+import { extensionDir, installBrowserIntegration, startBridgeServer, type BrowserSetupResult } from './browser'
 import type {
   AppState,
   AppSettings,
@@ -216,6 +217,30 @@ export function registerIpc(): void {
       win?.focus()
       return { ok: false, error: (err as Error).message }
     }
+  })
+
+  // ---- browser integration (Chrome-style in-page autofill) --------------------
+
+  ipcMain.handle('browser:install', async (): Promise<Result<BrowserSetupResult>> => {
+    try {
+      return { ok: true, value: await installBrowserIntegration() }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle('browser:revealExtension', async (): Promise<Result> => {
+    const err = await shell.openPath(extensionDir())
+    return err ? { ok: false, error: err } : { ok: true }
+  })
+}
+
+/** Local socket the browser-extension relay connects to. */
+export function startBridge(): void {
+  startBridgeServer({
+    isUnlocked: () => vault.isUnlocked(),
+    listEntries: () => vault.list(),
+    showWindow: () => showMainWindow()
   })
 }
 

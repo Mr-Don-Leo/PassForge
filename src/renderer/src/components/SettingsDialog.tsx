@@ -17,6 +17,7 @@ import {
   Typography
 } from '@mui/material'
 import FileUploadRoundedIcon from '@mui/icons-material/FileUploadRounded'
+import ExtensionRoundedIcon from '@mui/icons-material/ExtensionRounded'
 import { api, DEFAULT_SETTINGS, type AppState, type AppSettings } from '../api'
 import { useColorMode, type ThemePref } from '../ColorMode'
 import PasscodeInput from './PasscodeInput'
@@ -64,6 +65,20 @@ export default function SettingsDialog({ open, state, onClose, onChange, onReque
     const res = enabled ? await api.enrollBiometric() : await api.disableBiometric()
     setMsg(res.ok ? { kind: 'success', text: enabled ? 'Biometric enabled.' : 'Biometric disabled.' } : { kind: 'error', text: res.error })
     onChange()
+  }
+
+  const setupBrowser = async (): Promise<void> => {
+    const res = await api.installBrowserIntegration()
+    if (res.ok) {
+      setMsg({
+        kind: 'success',
+        text: res.value.configured.length
+          ? `Configured for ${res.value.configured.join(', ')}. Now load the extension folder via chrome://extensions → Load unpacked.`
+          : 'No Chromium-based browser profile found on this machine.'
+      })
+    } else {
+      setMsg({ kind: 'error', text: res.error })
+    }
   }
 
   const changePasscode = async (): Promise<void> => {
@@ -182,6 +197,28 @@ export default function SettingsDialog({ open, state, onClose, onChange, onReque
                 Linux needs xdotool (X11).
               </Typography>
             </Stack>
+          </Box>
+
+          <Divider />
+
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              Browser integration
+            </Typography>
+            <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+              <Button variant="outlined" startIcon={<ExtensionRoundedIcon />} onClick={setupBrowser}>
+                Set up in-page autofill
+              </Button>
+              <Button variant="text" onClick={() => api.revealExtension()}>
+                Show extension folder
+              </Button>
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+              Fills login forms inside Chrome, Edge or Brave — like Chrome's own password manager.
+              Click set-up, then in your browser open chrome://extensions, enable Developer mode and
+              “Load unpacked” the extension folder. Focusing a login field then shows your matching
+              PassForge entries; picking one fills username and password in place (vault must be unlocked).
+            </Typography>
           </Box>
 
           <Divider />

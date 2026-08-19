@@ -41,8 +41,16 @@ new fields, and `loadPayload()` appends locked default categories missing from o
 vaults, so old vaults migrate automatically on unlock.
 
 ## 3. Recent changes
-Latest: **v0.6.0**. Tree is clean — no uncommitted work (besides this PREP.md).
+Latest: **v0.6.1**. Tree is clean — no uncommitted work (besides this PREP.md).
 Recent line (newest first):
+- `d738477` **fix: explicit focus hand-back for autofill** (v0.6.1) — user report: after
+  the hotkey fell back to the PassForge window, typing landed back in PassForge instead
+  of the website. `getActiveWindow()` now captures an id (mac process name / Windows
+  HWND / X11 window id) + title; the fallback paths (ambiguous, no match, locked)
+  remember it (90 s TTL) and `autotype:perform` calls `focusWindow()` on it *before*
+  hiding our window (ordering matters: being foreground grants SetForegroundWindow
+  rights on Windows), then types after 300 ms. Manual ✦ clicks (no captured target)
+  keep the old hide + 650 ms behavior. Still unverified on real hardware.
 - `fea0c22` **feat: autofill / auto-type** (v0.6.0) — global hotkey **⌘/Ctrl+Shift+U**
   matches the focused window's title against password entries (URL host 3 > site
   name 2 > entry title 1; only the top tier returned, unique ⇒ type immediately,

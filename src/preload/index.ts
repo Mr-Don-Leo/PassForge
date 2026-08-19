@@ -1,7 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AppState,
-  AutoLockSettings,
+  AppSettings,
+  AutotypeStatus,
   Category,
   ImportResult,
   PasswordOptions,
@@ -46,14 +47,22 @@ const api = {
     skipDuplicates: boolean
   ): Promise<Result<{ added: number; skipped: number }>> =>
     ipcRenderer.invoke('vault:importEntries', entries, category, skipDuplicates),
-  getSettings: (): Promise<Result<AutoLockSettings>> => ipcRenderer.invoke('settings:get'),
-  setSettings: (patch: Partial<AutoLockSettings>): Promise<Result<AutoLockSettings>> =>
+  getSettings: (): Promise<Result<AppSettings>> => ipcRenderer.invoke('settings:get'),
+  setSettings: (patch: Partial<AppSettings>): Promise<Result<AppSettings>> =>
     ipcRenderer.invoke('settings:set', patch),
+  /** Hide the window and type this entry's credentials into the previous app. */
+  autotype: (id: string): Promise<Result> => ipcRenderer.invoke('autotype:perform', id),
   /** Subscribe to main-process auto-locks. Returns an unsubscribe function. */
   onLocked: (cb: () => void): (() => void) => {
     const listener = (): void => cb()
     ipcRenderer.on('vault:locked', listener)
     return () => ipcRenderer.removeListener('vault:locked', listener)
+  },
+  /** Subscribe to auto-type feedback (toasts). Returns an unsubscribe function. */
+  onAutotypeStatus: (cb: (status: AutotypeStatus) => void): (() => void) => {
+    const listener = (_e: unknown, status: AutotypeStatus): void => cb(status)
+    ipcRenderer.on('autotype:status', listener)
+    return () => ipcRenderer.removeListener('autotype:status', listener)
   }
 }
 

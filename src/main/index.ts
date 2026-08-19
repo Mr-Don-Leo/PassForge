@@ -1,6 +1,6 @@
-import { app, BrowserWindow, shell, powerMonitor } from 'electron'
+import { app, BrowserWindow, shell, powerMonitor, globalShortcut } from 'electron'
 import { join } from 'node:path'
-import { registerIpc, lockVault, lockAndNotify } from './ipc'
+import { registerIpc, lockVault, lockAndNotify, syncAutotypeShortcut } from './ipc'
 import { getSettings } from './settings'
 
 const isDev = !app.isPackaged
@@ -55,6 +55,8 @@ function createWindow(): void {
 app.whenReady().then(() => {
   registerIpc()
   createWindow()
+  // Global autofill hotkey (Cmd/Ctrl+Shift+U), honoring the user's setting.
+  syncAutotypeShortcut()
 
   // OS-level auto-lock triggers. Sleep and screen-lock (also fired on fast
   // user-switching) lock the vault and notify the renderer.
@@ -75,6 +77,8 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => lockVault())
+
+app.on('will-quit', () => globalShortcut.unregisterAll())
 
 // Deny attempts to open new windows / webviews for defence in depth.
 app.on('web-contents-created', (_e, contents) => {

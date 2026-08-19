@@ -21,6 +21,7 @@ Material-design UI · biometric + 6-digit passcode unlock · AES-256-GCM encrypt
 - **Custom categories** — create your own with a preset icon and colour, rename, hide, or delete the built-in ones; browse by category in the sidebar.
 - **Built-in generator** with adjustable length and character sets, for passwords and secrets.
 - **Password health dashboard** — on-device scan for reused, weak, similar, old, or incomplete passwords, duplicates, and API keys due for rotation. Never leaves your device.
+- **Autofill (auto-type)** — focus a login form in any browser or app and press **⌘/Ctrl+Shift+U**: PassForge matches the window against your entries (by website URL and title) and types `username → Tab → password` (optional Enter). Ambiguous? The vault pops up so you can pick an entry and hit its ✦ autofill button. Uses only OS built-ins — System Events on macOS (needs Accessibility access), SendKeys on Windows, `xdotool` on Linux (X11).
 - **Import** from Bitwarden (JSON/CSV), 1Password, KeePass, Chrome, Firefox, Safari, or generic CSV — parsed locally.
 - **Auto-lock** on inactivity, sleep, screen-lock/user-switch, minimize, or quit, plus ⌘/Ctrl+L to lock instantly.
 - **Favorites & light/dark themes** with a system-follow option, toggled from the toolbar or Settings.

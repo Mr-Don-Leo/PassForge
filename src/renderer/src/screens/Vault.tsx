@@ -39,6 +39,7 @@ import GitHubIcon from '@mui/icons-material/GitHub'
 import StarRoundedIcon from '@mui/icons-material/StarRounded'
 import StarBorderRoundedIcon from '@mui/icons-material/StarBorderRounded'
 import ShieldRoundedIcon from '@mui/icons-material/ShieldRounded'
+import AutoFixHighRoundedIcon from '@mui/icons-material/AutoFixHighRounded'
 import { api, categoryById, type AppState, type Category, type ImportResult, type ItemType, type VaultEntry } from '../api'
 import { analyze } from '../health'
 import { CategoryIcon } from '../categories'
@@ -142,6 +143,15 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
     await api.toggleFavorite(id)
     load()
   }
+
+  // Hides the window (focus returns to the previous app) and types there.
+  const autofill = async (id: string): Promise<void> => {
+    const res = await api.autotype(id)
+    if (!res.ok) setToast(res.error)
+  }
+
+  // Feedback from the global autofill hotkey (no match, missing OS access, …).
+  useEffect(() => api.onAutotypeStatus((s) => setToast(s.message)), [])
 
   const requestImport = async (): Promise<void> => {
     setSettingsOpen(false)
@@ -407,6 +417,19 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
                       sx={{ mb: 1 }}
                       secondaryAction={
                         <Stack direction="row" spacing={0.5}>
+                          {!isSecret && !isRecovery && (
+                            <Tooltip title="Autofill — hides PassForge and types into the previous app (⌘/Ctrl+Shift+U works from anywhere)">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  disabled={!entry.username && !entry.password}
+                                  onClick={() => autofill(entry.id)}
+                                >
+                                  <AutoFixHighRoundedIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
                           <Tooltip title={entry.favorite ? 'Unfavorite' : 'Favorite'}>
                             <IconButton size="small" onClick={() => toggleFavorite(entry.id)}>
                               {entry.favorite ? (
@@ -450,7 +473,13 @@ export default function VaultScreen({ state, onLock, onStateChange }: Props): JS
                     >
                       <ListItemButton
                         onClick={() => openEdit(entry)}
-                        sx={{ borderRadius: 2.5, border: '1px solid', borderColor: 'divider', pr: 18, py: 1.25 }}
+                        sx={{
+                          borderRadius: 2.5,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          pr: isSecret || isRecovery ? 18 : 22,
+                          py: 1.25
+                        }}
                       >
                         <ListItemIcon sx={{ minWidth: 52 }}>
                           <Avatar

@@ -17,7 +17,7 @@ import {
   Typography
 } from '@mui/material'
 import FileUploadRoundedIcon from '@mui/icons-material/FileUploadRounded'
-import { api, DEFAULT_AUTOLOCK, type AppState, type AutoLockSettings } from '../api'
+import { api, DEFAULT_SETTINGS, type AppState, type AppSettings } from '../api'
 import { useColorMode, type ThemePref } from '../ColorMode'
 import PasscodeInput from './PasscodeInput'
 
@@ -42,22 +42,22 @@ export default function SettingsDialog({ open, state, onClose, onChange, onReque
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [msg, setMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
-  const [lock, setLock] = useState<AutoLockSettings>(DEFAULT_AUTOLOCK)
+  const [prefs, setPrefs] = useState<AppSettings>(DEFAULT_SETTINGS)
   const { pref, setPref } = useColorMode()
 
   useEffect(() => {
     if (open) {
       api.getSettings().then((r) => {
-        if (r.ok) setLock(r.value)
+        if (r.ok) setPrefs(r.value)
       })
     }
   }, [open])
 
-  const updateLock = async (patch: Partial<AutoLockSettings>): Promise<void> => {
-    const optimistic = { ...lock, ...patch }
-    setLock(optimistic)
+  const updatePrefs = async (patch: Partial<AppSettings>): Promise<void> => {
+    const optimistic = { ...prefs, ...patch }
+    setPrefs(optimistic)
     const r = await api.setSettings(patch)
-    if (r.ok) setLock(r.value)
+    if (r.ok) setPrefs(r.value)
   }
 
   const toggleBiometric = async (enabled: boolean): Promise<void> => {
@@ -110,8 +110,8 @@ export default function SettingsDialog({ open, state, onClose, onChange, onReque
                 select
                 size="small"
                 label="After inactivity"
-                value={lock.inactivityMinutes}
-                onChange={(e) => updateLock({ inactivityMinutes: Number(e.target.value) })}
+                value={prefs.inactivityMinutes}
+                onChange={(e) => updatePrefs({ inactivityMinutes: Number(e.target.value) })}
               >
                 {INACTIVITY_OPTIONS.map((o) => (
                   <MenuItem key={o.v} value={o.v}>
@@ -120,19 +120,54 @@ export default function SettingsDialog({ open, state, onClose, onChange, onReque
                 ))}
               </TextField>
               <FormControlLabel
-                control={<Switch checked={lock.onSleep} onChange={(e) => updateLock({ onSleep: e.target.checked })} />}
+                control={<Switch checked={prefs.onSleep} onChange={(e) => updatePrefs({ onSleep: e.target.checked })} />}
                 label={<Typography variant="body2">When the computer sleeps</Typography>}
               />
               <FormControlLabel
-                control={<Switch checked={lock.onScreenLock} onChange={(e) => updateLock({ onScreenLock: e.target.checked })} />}
+                control={<Switch checked={prefs.onScreenLock} onChange={(e) => updatePrefs({ onScreenLock: e.target.checked })} />}
                 label={<Typography variant="body2">When the screen locks or user switches</Typography>}
               />
               <FormControlLabel
-                control={<Switch checked={lock.onMinimize} onChange={(e) => updateLock({ onMinimize: e.target.checked })} />}
+                control={<Switch checked={prefs.onMinimize} onChange={(e) => updatePrefs({ onMinimize: e.target.checked })} />}
                 label={<Typography variant="body2">When the app is minimized</Typography>}
               />
               <Typography variant="caption" color="text.secondary">
                 The vault always locks on quit. Press ⌘/Ctrl+L to lock instantly.
+              </Typography>
+            </Stack>
+          </Box>
+
+          <Divider />
+
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              Autofill (auto-type)
+            </Typography>
+            <Stack spacing={0.5} sx={{ mt: 1 }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={prefs.autotypeEnabled}
+                    onChange={(e) => updatePrefs({ autotypeEnabled: e.target.checked })}
+                  />
+                }
+                label={<Typography variant="body2">Enable autofill</Typography>}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={prefs.autotypeSubmit}
+                    disabled={!prefs.autotypeEnabled}
+                    onChange={(e) => updatePrefs({ autotypeSubmit: e.target.checked })}
+                  />
+                }
+                label={<Typography variant="body2">Press Enter after filling</Typography>}
+              />
+              <Typography variant="caption" color="text.secondary">
+                Focus a login form in any app or browser, then press ⌘/Ctrl+Shift+U. PassForge matches
+                the window against your entries (by website and title) and types username, Tab, password.
+                You can also click the ✦ autofill button on an entry. macOS asks for Accessibility
+                access on first use; Linux needs xdotool (X11).
               </Typography>
             </Stack>
           </Box>

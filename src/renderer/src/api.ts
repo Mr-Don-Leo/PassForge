@@ -8,7 +8,8 @@ export type {
   Result,
   Category,
   ItemType,
-  AutoLockSettings,
+  AppSettings,
+  AutotypeStatus,
   ImportResult,
   ImportFormat
 } from '../../shared/types'
@@ -18,6 +19,6 @@ export {
   RECOVERY_CATEGORY,
   FALLBACK_CATEGORY,
   CATEGORY_ICON_IDS,
-  DEFAULT_AUTOLOCK,
+  DEFAULT_SETTINGS,
   categoryById
 } from '../../shared/types'

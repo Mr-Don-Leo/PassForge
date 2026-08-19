@@ -31,20 +31,32 @@ export interface VaultEntry {
   updatedAt: number
 }
 
-/** User preferences for automatic locking. Not secret; stored outside the vault. */
-export interface AutoLockSettings {
+/** User preferences (auto-lock + autofill). Not secret; stored outside the vault. */
+export interface AppSettings {
   /** Lock after N minutes of inactivity (0 = never). */
   inactivityMinutes: number
   onSleep: boolean
   onScreenLock: boolean
   onMinimize: boolean
+  /** Global auto-type hotkey + per-entry autofill button. */
+  autotypeEnabled: boolean
+  /** Press Enter after typing the credentials. */
+  autotypeSubmit: boolean
 }
 
-export const DEFAULT_AUTOLOCK: AutoLockSettings = {
+export const DEFAULT_SETTINGS: AppSettings = {
   inactivityMinutes: 5,
   onSleep: true,
   onScreenLock: true,
-  onMinimize: false
+  onMinimize: false,
+  autotypeEnabled: true,
+  autotypeSubmit: false
+}
+
+/** Feedback from the main process about an auto-type attempt (shown as a toast). */
+export interface AutotypeStatus {
+  kind: 'info' | 'error'
+  message: string
 }
 
 export type ImportFormat =

@@ -41,8 +41,19 @@ new fields, and `loadPayload()` appends locked default categories missing from o
 vaults, so old vaults migrate automatically on unlock.
 
 ## 3. Recent changes
-Latest: **v0.6.1**. Tree is clean — no uncommitted work (besides this PREP.md).
+Latest: **v0.7.0**. Tree is clean — no uncommitted work (besides this PREP.md).
 Recent line (newest first):
+- `0a00149` **feat: hotkey-free autofill offers** (v0.7.0) — new `src/main/watcher.ts`
+  streams focused-window changes (persistent osascript `repeat`/`log` loop on mac —
+  reads **stderr**; persistent PowerShell loop on Windows — stdout, `\t`-separated
+  `hwnd\ttitle`; 1.2 s xdotool poll on X11, self-stops after 3 failures e.g. Wayland).
+  `ipc.ts onWindowChange`: unlocked + not-our-window + `matchEntriesToWindow` hit →
+  Electron `Notification` ("Autofill GitHub?"); click → `focusWindow` + type, or the
+  picker flow when ambiguous. 10-min per-entry cooldown (`offerShownAt`). New setting
+  `autotypeOffer` (default true) gated by `autotypeEnabled`; watcher synced on settings
+  change. mac watcher starts only if Accessibility already granted (no background
+  prompt). Windows notifications need the AUMID set in index.ts. Watcher failure path
+  verified via esbuild harness; notification click-through NOT tested on hardware.
 - `d738477` **fix: explicit focus hand-back for autofill** (v0.6.1) — user report: after
   the hotkey fell back to the PassForge window, typing landed back in PassForge instead
   of the website. `getActiveWindow()` now captures an id (mac process name / Windows

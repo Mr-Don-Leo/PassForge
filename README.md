@@ -6,6 +6,8 @@
 
 Material-design UI · biometric + 6-digit passcode unlock · AES-256-GCM encrypted vault · zero servers.
 
+**[Website](https://mr-don-leo.github.io/PassForge/)** · **[Download](https://github.com/Mr-Don-Leo/PassForge/releases/latest)**
+
 </div>
 
 ---

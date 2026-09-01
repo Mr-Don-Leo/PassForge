@@ -43,6 +43,16 @@ vaults, so old vaults migrate automatically on unlock.
 ## 3. Recent changes
 Latest: **v0.8.0**. Tree is clean — no uncommitted work (besides this PREP.md).
 Recent line (newest first):
+- `0bb8b29` **feat: GitHub Pages landing page** — `docs/index.html` (self-contained,
+  styled on the app's MUI theme from `theme.ts`: Roboto, radius 14, light+dark via
+  the same `passforge-theme` localStorage key) + `docs/icon.png`. Pages serves
+  main:/docs at https://mr-don-leo.github.io/PassForge/. Download buttons resolve
+  direct asset URLs from the latest-release API at page load (fallback: releases page).
+- **History rewritten (2026-09-01):** all `Co-Authored-By: Claude` trailers stripped
+  from every commit; branch + all 15 tags force-pushed (release workflow was disabled
+  during the push so re-pushed tags didn't re-trigger builds; releases untouched).
+  ⚠️ **Do NOT add Claude co-author trailers to commits in this repo** — owner wants
+  no Claude attribution. Pre-rewrite backup: `~/passforge-pre-rewrite-backup.bundle`.
 - `ee84354` **feat: Chrome-style in-page autofill** (v0.8.0) — `extension/` (MV3,
   Chrome/Edge/Brave; stable ID `nhijkfecbioegiplfklgppedakljfgea` pinned via manifest
   `key`; the RSA private key was throwaway — only needed again for a Web Store upload,
